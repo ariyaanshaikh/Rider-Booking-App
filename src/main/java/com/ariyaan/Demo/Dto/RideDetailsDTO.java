@@ -1,0 +1,112 @@
+package com.ariyaan.Demo.Dto;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
+public class RideDetailsDTO {
+
+	private int rideId;
+
+	@NotNull(message = "Pickup latitude is required")
+	private Double pickUpLatitude;
+
+	@NotNull(message = "Pickup longitude is required")
+	private Double pickUpLongitude;
+
+	@NotNull(message = "Drop latitude is required")
+	private Double dropLatitude;
+
+	@NotNull(message = "Drop longitude is required")
+	private Double dropLongitude;
+
+	@NotNull(message = "Fare is required")
+	@Positive(message = "Fare must be positive")
+	private Double fare;
+
+	private int riderId;
+
+	@NotNull(message = "Admin ID (User ID) is required")
+	private Integer adminId;
+
+	private long rideOtp;
+	private String rideStatus;
+	
+	// Constructors
+	public RideDetailsDTO() {
+	}
+
+	public RideDetailsDTO(Double pickUpLatitude, Double pickUpLongitude, 
+			Double dropLatitude, Double dropLongitude, Double fare, Integer adminId) {
+		this.pickUpLatitude = pickUpLatitude;
+		this.pickUpLongitude = pickUpLongitude;
+		this.dropLatitude = dropLatitude;
+		this.dropLongitude = dropLongitude;
+		this.fare = fare;
+		this.adminId = adminId;
+	}
+	
+	// Getters and Setters
+	public int getRideId() {
+		return rideId;
+	}
+	public void setRideId(int rideId) {
+		this.rideId = rideId;
+	}
+	public double getPickUpLatitude() {
+		return pickUpLatitude;
+	}
+	public void setPickUpLatitude(double pickUpLatitude) {
+		this.pickUpLatitude = pickUpLatitude;
+	}
+	public double getPickUpLongitude() {
+		return pickUpLongitude;
+	}
+	public void setPickUpLongitude(double pickUpLongitude) {
+		this.pickUpLongitude = pickUpLongitude;
+	}
+	public double getDropLatitude() {
+		return dropLatitude;
+	}
+	public void setDropLatitude(double dropLatitude) {
+		this.dropLatitude = dropLatitude;
+	}
+	public double getDropLongitude() {
+		return dropLongitude;
+	}
+	public void setDropLongitude(double dropLongitude) {
+		this.dropLongitude = dropLongitude;
+	}
+	public double getFare() {
+		return fare;
+	}
+	public void setFare(double fare) {
+		this.fare = fare;
+	}
+	public int getRiderId() {
+		return riderId;
+	}
+	public void setRiderId(int riderId) {
+		this.riderId = riderId;
+	}
+	public int getAdminId() {
+		return adminId;
+	}
+	public void setAdminId(int adminId) {
+		this.adminId = adminId;
+	}
+	public long getRideOtp() {
+		return rideOtp;
+	}
+	public void setRideOtp(long rideOtp) {
+		this.rideOtp = rideOtp;
+	}
+	public String getRideStatus() {
+		return rideStatus;
+	}
+	public void setRideStatus(String rideStatus) {
+		this.rideStatus = rideStatus;
+	}
+	
+	
+}
