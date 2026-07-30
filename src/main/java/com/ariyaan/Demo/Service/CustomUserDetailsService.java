@@ -153,7 +153,11 @@ public class CustomUserDetailsService implements UserDetailsService{
 	}
 	
 	public boolean verifyEmailAddress(String emailAddress) {
-		Optional<User> existingUser =  userRepository.findByEmail(emailAddress);
+		if (emailAddress == null || emailAddress.isBlank()) {
+			return false;
+		}
+
+		Optional<User> existingUser = userRepository.findByEmailIgnoreCase(emailAddress.trim());
 		if(existingUser.isPresent()) {
 			User user = existingUser.get();
 			user.setToken(otpService.generateOtp());
