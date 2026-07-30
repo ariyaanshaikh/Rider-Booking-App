@@ -12,11 +12,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import jakarta.validation.Valid;
 
 import com.ariyaan.Demo.Dto.RiderDetailsDTO;
-import com.ariyaan.Demo.Dto.RiderLocationDTO;
+import com.ariyaan.Demo.Dto.RiderLiveLocationUpdateDTO;
 import com.ariyaan.Demo.Entity.RiderDemoEntity;
 import com.ariyaan.Demo.Service.LiveLocationTrackingService;
 import com.ariyaan.Demo.Service.RiderDemoService;
@@ -103,16 +104,21 @@ public class LiveLocationTrackingController {
 	// To livetrack the rider and show it to the admin
 	
 	@PostMapping("/fetch/livelocation")
-	public void updateLocation(@RequestBody RiderLocationDTO location) {
-		liveLocationTrackingService.sendLocationUpdate(location);
-		
+	public ResponseEntity<java.util.Map<String, Object>> updateLocation(
+			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
+		return ResponseEntity.ok(liveLocationTrackingService
+				.publishAuthenticatedRiderLocation(authentication.getName(), location));
 	}
 	
-	// TOn save rider current location in DB
-	
+	/**
+	 * Legacy alias for clients that previously called /save/location. It has the
+	 * same secure contract as /fetch/livelocation: latitude and longitude only.
+	 */
 	@PostMapping("/save/location")
-	public void saveLocation(@RequestBody RiderLocationDTO location) {
-		liveLocationTrackingService.saveRiderCurrentLocation(location);	
+	public ResponseEntity<java.util.Map<String, Object>> saveLocation(
+			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
+		return ResponseEntity.ok(liveLocationTrackingService
+				.publishAuthenticatedRiderLocation(authentication.getName(), location));
 	}
 
 	@GetMapping("/nearby")

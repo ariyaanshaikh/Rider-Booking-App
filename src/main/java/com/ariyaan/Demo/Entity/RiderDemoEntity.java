@@ -1,5 +1,6 @@
 package com.ariyaan.Demo.Entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,6 +20,9 @@ public class RiderDemoEntity {
 	private String mobile_number;
     
 	private String status; // AVAILABLE, ON_TRIP, OFFLINE
+
+	@Column(name = "USER_ID", unique = true)
+	private Long userId;
 
 	public long getId() {
 		return id;
@@ -51,6 +55,9 @@ public class RiderDemoEntity {
 	public void setStatus(String status) {
 		this.status = status;
 	}
+
+	public Long getUserId() { return userId; }
+	public void setUserId(Long userId) { this.userId = userId; }
 	
 
 }

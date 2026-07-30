@@ -33,6 +33,7 @@ public class RiderDemoServiceImpl implements RiderDemoService{
 		rider.setName(riderDetails.getName());
 		rider.setMobile_number(riderDetails.getMobileNumber());
 		rider.setStatus(riderDetails.getStatus());
+		rider.setUserId(riderDetails.getUserId());
 		return riderDemoRepository.save(rider);
 	}
 }

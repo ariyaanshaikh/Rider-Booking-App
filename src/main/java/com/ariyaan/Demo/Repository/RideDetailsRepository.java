@@ -1,6 +1,8 @@
 package com.ariyaan.Demo.Repository;
 
 import java.util.List;
+import java.util.Collection;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -48,6 +50,9 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 	 List<RideDetailsEntity> findByRideId(int rideId);
 
 	 List<RideDetailsEntity> findByRiderIdOrderByRideIdDesc(int riderId);
+
+	 Optional<RideDetailsEntity> findFirstByRiderIdAndRideStatusInOrderByRideIdDesc(
+			 int riderId, Collection<String> rideStatuses);
 	 
 	 
 	 // TODO need to create new column in RIDE_DETAILS table with column > createdAt
