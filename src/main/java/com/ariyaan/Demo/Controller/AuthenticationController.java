@@ -92,8 +92,21 @@ public class AuthenticationController {
 	
 	// forgot password re-email verification api
 	@GetMapping("/verifyEmail")
-	public boolean verifyEmail(@RequestParam("emailAddress") String emailAddress) {
-		return customUserDetailsService.verifyEmailAddress(emailAddress);
+	@ResponseBody
+	public ResponseEntity<?> verifyEmail(@RequestParam("emailAddress") String emailAddress) {
+		boolean emailRequested = customUserDetailsService.verifyEmailAddress(emailAddress);
+
+		if (!emailRequested) {
+			return ResponseEntity.status(404).body(Map.of(
+					"success", false,
+					"message", "No user was found for this email address"
+			));
+		}
+
+		return ResponseEntity.ok(Map.of(
+				"success", true,
+				"message", "A confirmation email has been requested"
+		));
 	}
 	
 	

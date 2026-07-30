@@ -2,6 +2,7 @@ package com.ariyaan.Demo.Service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.task.TaskExecutionProperties.Simple;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -9,6 +10,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EmailService {
+
+	@Value("${app.public-base-url:http://localhost:8088}")
+	private String publicBaseUrl;
 
 	private final JavaMailSender mailSender;
 
@@ -32,10 +36,10 @@ public class EmailService {
 					
 					Please confirm your email.
 					
-					http://localhost:8088/register/confirmToken?token=%s
+					%s/register/confirmToken?token=%s
 					
 					
-					""".formatted(token,token);
+				""".formatted(token, publicBaseUrl, token);
 			message.setText(messageBody);
 			mailSender.send(message);
 			
