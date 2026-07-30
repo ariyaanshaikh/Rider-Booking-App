@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.ariyaan.Demo.Entity.User;
+import com.ariyaan.Demo.Entity.UserRole;
 import com.ariyaan.Demo.Repository.UserRepository;
 import com.ariyaan.Demo.config.JwtUtils;
 
@@ -81,6 +82,10 @@ public class CustomUserDetailsService implements UserDetailsService{
 	        .ifPresent(existingUser -> {
 	            throw new IllegalStateException("User Already Exists");
 	        });
+
+	    if (user.getRole() == null) {
+	    throw new IllegalArgumentException("role is required and must be ADMIN or RIDER");
+	    }
 
 	    // 2. Encrypt the password
 	    user.setPassword(passwordEncoder.encode(user.getPassword()));

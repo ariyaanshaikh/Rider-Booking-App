@@ -1,6 +1,7 @@
 package com.ariyaan.Demo.Dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 /** Request payload used to create a rider available for matching. */
@@ -16,6 +17,7 @@ public class RiderDetailsDTO {
     private String status = "AVAILABLE";
 
     /** Account from USERS that owns this rider profile. */
+    @NotNull(message = "A rider userId is required")
     private Long userId;
 
     public String getName() { return name; }

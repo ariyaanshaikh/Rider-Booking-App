@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 
@@ -97,6 +98,7 @@ public class LiveLocationTrackingController {
 	}
 
 	@PostMapping
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<RiderDemoEntity> createRider(@Valid @RequestBody RiderDetailsDTO riderDetails) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(riderDemoService.createRider(riderDetails));
 	}
@@ -104,6 +106,7 @@ public class LiveLocationTrackingController {
 	// To livetrack the rider and show it to the admin
 	
 	@PostMapping("/fetch/livelocation")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<java.util.Map<String, Object>> updateLocation(
 			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
 		return ResponseEntity.ok(liveLocationTrackingService
@@ -115,6 +118,7 @@ public class LiveLocationTrackingController {
 	 * same secure contract as /fetch/livelocation: latitude and longitude only.
 	 */
 	@PostMapping("/save/location")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<java.util.Map<String, Object>> saveLocation(
 			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
 		return ResponseEntity.ok(liveLocationTrackingService

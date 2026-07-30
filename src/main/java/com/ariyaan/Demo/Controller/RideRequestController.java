@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.ariyaan.Demo.Dto.RideDetailsDTO;
 import com.ariyaan.Demo.Dto.RideRequestDTO;
@@ -61,6 +62,7 @@ public class RideRequestController {
 	 * 5. Notify riders via WebSocket
 	 */
 	@PostMapping("/request")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<String> requestRide(@Valid @RequestBody RideDetailsDTO rideRequest) {
 		int rideId = rideDetailsService.saveRideDetials(rideRequest);
 		return ResponseEntity.ok("Ride Request Sent, id=" + rideId);
@@ -72,6 +74,7 @@ public class RideRequestController {
 	 * Other riders are notified their request is cancelled.
 	 */
 	@PostMapping("/accept")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<String> acceptRide(
 			@RequestParam int rideId,
 			@RequestParam int riderId) {
@@ -88,6 +91,7 @@ public class RideRequestController {
 	 * Triggers rematch with next nearest riders.
 	 */
 	@PostMapping("/rider-cancel")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<String> riderCancel(@RequestParam int rideId, @RequestParam int riderId) {
 		rideService.riderCancel(rideId, riderId);
 		return ResponseEntity.ok("Rider cancellation handled and rematch attempted");
@@ -97,6 +101,7 @@ public class RideRequestController {
 	 * User/admin cancels the ride.
 	 */
 	@PostMapping("/cancel")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<String> userCancel(@RequestParam int rideId) {
 		rideService.userCancel(rideId);
 		return ResponseEntity.ok("Ride cancelled by user/admin");
@@ -111,6 +116,7 @@ public class RideRequestController {
 	 * On success, marks ride as STARTED and notifies user/rider.
 	 */
 	@PostMapping("/verify-otp")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<String> verifyOtp(
 	        @RequestParam int rideId,
 			@RequestParam int riderId,
@@ -128,6 +134,7 @@ public class RideRequestController {
 	 * Marks ride as COMPLETED, rider as AVAILABLE, and creates invoice.
 	 */
 	@PostMapping("/end")
+	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<String> endRide(@RequestParam int rideId, @RequestParam int riderId) {
 		boolean ended = rideService.endRide(rideId, riderId);
 		if (ended) {

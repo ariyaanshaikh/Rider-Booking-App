@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -82,10 +84,14 @@ public class User implements UserDetails {
 	
 	@Column(name = "mobile_otp")
 	private String mobileOtp;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "role", nullable = false)
+	private UserRole role;
 	
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_USER");
+		SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.name());
 		return List.of(authority);
 	}
 
@@ -237,6 +243,14 @@ public class User implements UserDetails {
 
 	public void setMobileOtp(String mobileOtp) {
 		this.mobileOtp = mobileOtp;
+	}
+
+	public UserRole getRole() {
+		return role;
+	}
+
+	public void setRole(UserRole role) {
+		this.role = role;
 	}
 
 	
