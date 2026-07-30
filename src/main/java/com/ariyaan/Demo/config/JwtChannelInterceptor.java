@@ -9,6 +9,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -44,26 +45,32 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                 authHeaders = accessor.getNativeHeader("authorization");
             }
 
-            if (authHeaders != null && !authHeaders.isEmpty()) {
-                String bearer = authHeaders.get(0);
-                if (bearer != null && bearer.startsWith("Bearer ")) {
-                    String token = bearer.substring(7);
-                    try {
-                        String username = jwtUtils.extractUsername(token);
-                        if (username != null && accessor.getUser() == null) {
-                            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                            if (jwtUtils.validateToken(token, userDetails)) {
-                                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                                        userDetails, null, userDetails.getAuthorities());
-                                accessor.setUser(auth);
-                            }
-                        }
-                    } catch (Exception ex) {
-                        // Failed to authenticate websocket CONNECT. We don't reject the frame here
-                        // to let other layers decide; logging helps debugging clients.
-                        log.debug("WebSocket CONNECT authentication failed: {}", ex.getMessage());
-                    }
+            if (authHeaders == null || authHeaders.isEmpty()) {
+                throw new AccessDeniedException("A Bearer token is required for the WebSocket connection");
+            }
+
+            String bearer = authHeaders.get(0);
+            if (bearer == null || !bearer.startsWith("Bearer ")) {
+                throw new AccessDeniedException("A valid Bearer token is required for the WebSocket connection");
+            }
+
+            try {
+                String token = bearer.substring(7);
+                String username = jwtUtils.extractUsername(token);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                if (!jwtUtils.validateToken(token, userDetails)) {
+                    throw new AccessDeniedException("WebSocket token is invalid or expired");
                 }
+
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                accessor.setUser(auth);
+            } catch (AccessDeniedException ex) {
+                throw ex;
+            } catch (Exception ex) {
+                log.debug("WebSocket CONNECT authentication failed: {}", ex.getMessage());
+                throw new AccessDeniedException("WebSocket token is invalid or expired");
             }
         }
 

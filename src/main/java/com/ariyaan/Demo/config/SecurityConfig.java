@@ -53,7 +53,10 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable()) // CSRF is not needed for JWT/Mobile
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/register/**", "/otp/**", "/demo", "/health", "/error","/sendJWT").permitAll() // here all the endpoints that doesnot require JWT Token otherwise will get 403 forbidden error if we try to access it directly
+                // SockJS performs its HTTP handshake before the STOMP CONNECT
+                // frame can carry a JWT. The CONNECT frame itself is validated
+                // by JwtChannelInterceptor.
+                .requestMatchers("/register/**", "/otp/**", "/demo", "/health", "/error", "/sendJWT", "/ws/**").permitAll()
                 .anyRequest().authenticated()
             )
             // Tell Spring not to create sessions
