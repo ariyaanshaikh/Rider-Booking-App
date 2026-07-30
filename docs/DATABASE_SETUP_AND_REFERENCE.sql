@@ -94,8 +94,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON INVOICES(USER_ID);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON INVOICES(STATUS);
 CREATE INDEX IF NOT EXISTS idx_invoices_created_at ON INVOICES(CREATED_AT);
 
--- Matching reference query. It returns every currently AVAILABLE rider within
--- 10 km and ignores locations at least 10 minutes old.
+-- Matching reference query. It returns every VERIFIED, currently AVAILABLE
+-- rider within 10 km and ignores locations at least 10 minutes old.
 -- Change the two values below to the pickup latitude and longitude before use.
 WITH input_coordinates AS (
   SELECT 19.0760::DOUBLE PRECISION AS lat, 72.8777::DOUBLE PRECISION AS lon
@@ -108,9 +108,11 @@ WITH input_coordinates AS (
          ))) AS DISTANCE_KM
   FROM RIDER_LOCATION rl
   JOIN RIDER_DETAILS rd ON rd.ID = rl.RIDER_ID
+  JOIN RIDER_VERIFICATION_DETAILS rvd ON rvd.RIDER_ID = rd.ID
   CROSS JOIN input_coordinates i
   WHERE rl.UPDATED_AT > CURRENT_TIMESTAMP - INTERVAL '10 minutes'
     AND rd.STATUS = 'AVAILABLE'
+    AND rvd.IS_VERIFIED = TRUE
 )
 SELECT * FROM candidates WHERE DISTANCE_KM <= 10 ORDER BY DISTANCE_KM;
 

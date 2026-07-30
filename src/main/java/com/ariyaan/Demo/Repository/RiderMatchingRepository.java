@@ -32,8 +32,8 @@ public interface RiderMatchingRepository extends JpaRepository<RiderLocationEnti
 	
 	@Query(value = """
 			/*
-			 * Find every AVAILABLE rider within 10 km. Locations older than 10
-			 * minutes are stale and deliberately excluded from matching.
+			 * Find every verified, AVAILABLE rider within 10 km. Locations older
+			 * than 10 minutes are stale and deliberately excluded from matching.
 			 */
 			SELECT rider_id, current_latitude, current_longitude, distance
 			FROM (
@@ -47,8 +47,10 @@ public interface RiderMatchingRepository extends JpaRepository<RiderLocationEnti
 					) AS distance
 				FROM rider_location rl
 				JOIN rider_details rd ON rd.id = rl.rider_id
+				JOIN rider_verification_details rvd ON rvd.rider_id = rd.id
 				WHERE rl.updated_at > NOW() - INTERVAL '10 minutes'
 					AND rd.status = 'AVAILABLE'
+					AND rvd.is_verified = TRUE
 			) candidates
 			WHERE distance <= 10
 			ORDER BY distance
