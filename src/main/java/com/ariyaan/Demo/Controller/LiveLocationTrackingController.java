@@ -113,16 +113,13 @@ public class LiveLocationTrackingController {
 				.publishAuthenticatedRiderLocation(authentication.getName(), location));
 	}
 	
-	/**
-	 * Legacy alias for clients that previously called /save/location. It has the
-	 * same secure contract as /fetch/livelocation: latitude and longitude only.
-	 */
+	/** Stores the rider's pre-ride GPS point so the matching service can find them. */
 	@PostMapping("/save/location")
 	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<java.util.Map<String, Object>> saveLocation(
 			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
 		return ResponseEntity.ok(liveLocationTrackingService
-				.publishAuthenticatedRiderLocation(authentication.getName(), location));
+				.saveAuthenticatedRiderCurrentLocation(authentication.getName(), location));
 	}
 
 	@GetMapping("/nearby")

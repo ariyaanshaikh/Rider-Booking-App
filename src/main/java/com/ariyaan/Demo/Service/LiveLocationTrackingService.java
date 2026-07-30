@@ -82,10 +82,7 @@ public class LiveLocationTrackingService {
 	 */
 	public Map<String, Object> publishAuthenticatedRiderLocation(String username,
 			RiderLiveLocationUpdateDTO location) {
-		User account = userRepository.findByUserName(username)
-				.orElseThrow(() -> new AccessDeniedException("Authenticated account was not found"));
-		RiderDemoEntity rider = riderDemoRepository.findByUserId(account.getId())
-				.orElseThrow(() -> new AccessDeniedException("This account is not linked to a rider profile"));
+		RiderDemoEntity rider = findAuthenticatedRider(username);
 
 		RideDetailsEntity ride = rideDetailsRepository
 				.findFirstByRiderIdAndRideStatusInOrderByRideIdDesc((int) rider.getId(),
@@ -95,13 +92,9 @@ public class LiveLocationTrackingService {
 		User bookingUser = userRepository.findById((long) ride.getAdminId())
 				.orElseThrow(() -> new IllegalStateException("Booking user was not found"));
 
-		RiderLocationEntity riderLocation = riderLocationRepository.findById((int) rider.getId())
-				.orElse(new RiderLocationEntity());
-		riderLocation.setRiderId((int) rider.getId());
-		riderLocation.setLatitude(location.getLatitude());
-		riderLocation.setLongitude(location.getLongitude());
-		riderLocation.setUpdatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
-		riderLocationRepository.save(riderLocation);
+		// Atomic database upsert prevents duplicate rows when GPS updates overlap.
+		riderLocationRepository.updateRiderLocation((int) rider.getId(),
+				location.getLatitude(), location.getLongitude());
 
 		Map<String, Object> payload = Map.of(
 				"type", "RIDER_LOCATION_UPDATED",
@@ -113,6 +106,30 @@ public class LiveLocationTrackingService {
 				"/queue/ride/" + ride.getRideId() + "/location", payload);
 
 		return payload;
+	}
+
+	/**
+	 * Stores an available rider's current position for matching. Unlike live
+	 * tracking, this does not require an assigned ride and sends no WebSocket
+	 * event to a booking user.
+	 */
+	public Map<String, Object> saveAuthenticatedRiderCurrentLocation(String username,
+			RiderLiveLocationUpdateDTO location) {
+		RiderDemoEntity rider = findAuthenticatedRider(username);
+		riderLocationRepository.updateRiderLocation((int) rider.getId(),
+				location.getLatitude(), location.getLongitude());
+		return Map.of(
+				"type", "RIDER_LOCATION_SAVED",
+				"riderId", rider.getId(),
+				"latitude", location.getLatitude(),
+				"longitude", location.getLongitude());
+	}
+
+	private RiderDemoEntity findAuthenticatedRider(String username) {
+		User account = userRepository.findByUserName(username)
+				.orElseThrow(() -> new AccessDeniedException("Authenticated account was not found"));
+		return riderDemoRepository.findByUserId(account.getId())
+				.orElseThrow(() -> new AccessDeniedException("This account is not linked to a rider profile"));
 	}
 
 }
