@@ -144,16 +144,17 @@ public class CustomUserDetailsService implements UserDetailsService{
 	 //   return "Email confirmed successfully!";
 	}
 	
-	public Map<String,String> response(String token){
+	public Map<String, Object> response(String token){
 		
 		User user = userRepository.findByToken(token)
 	            .orElseThrow(() -> new IllegalStateException("Token not found"));
 		
-		 Map<String, String> response = new HashMap<>();
+		 Map<String, Object> response = new HashMap<>();
 		  String jwttoken = jwtUtils.generateToken(user.getUserName()); 
-	        
+        
 	        response.put("message", "OTP verified Successfully");
 	        response.put("token", jwttoken);
+	        response.put("userId", user.getId());
 	        return response;
 	}
 	

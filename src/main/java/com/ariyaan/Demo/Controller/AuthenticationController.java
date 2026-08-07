@@ -77,9 +77,9 @@ public class AuthenticationController {
 	// confirm token for email verification
 	@GetMapping("/confirmToken")
 	@ResponseBody
-	public Map<String,String> confirmToken(@RequestParam("token") String token, Model model) {
+	public Map<String, Object> confirmToken(@RequestParam("token") String token, Model model) {
 		
-		 Map<String, String> response = new HashMap<>();
+		 Map<String, Object> response = new HashMap<>();
 		    if (userDetailsService.confirmToken(token)) {
 		    	response = userDetailsService.response(token);
 		    	return response;
