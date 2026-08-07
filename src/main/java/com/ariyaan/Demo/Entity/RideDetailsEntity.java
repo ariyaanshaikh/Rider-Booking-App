@@ -30,6 +30,12 @@ public class RideDetailsEntity {
 	
 	@Column(name = "FARE")
 	private double fare;
+
+	@Column(name = "CHASSIS_NO")
+	private String chassisNo;
+
+	@Column(name = "VEHICLE_NAME")
+	private String vehicleName;
 	
 	@Column(name = "RIDER_ID")
 	private int riderId;
@@ -79,6 +85,18 @@ public class RideDetailsEntity {
 	}
 	public void setFare(double fare) {
 		this.fare = fare;
+	}
+	public String getChassisNo() {
+		return chassisNo;
+	}
+	public void setChassisNo(String chassisNo) {
+		this.chassisNo = chassisNo;
+	}
+	public String getVehicleName() {
+		return vehicleName;
+	}
+	public void setVehicleName(String vehicleName) {
+		this.vehicleName = vehicleName;
 	}
 	public int getRiderId() {
 		return riderId;

@@ -51,8 +51,13 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 
 	 List<RideDetailsEntity> findByRiderIdOrderByRideIdDesc(int riderId);
 
+	 List<RideDetailsEntity> findByAdminIdOrderByRideIdDesc(int adminId);
+
 	 Optional<RideDetailsEntity> findFirstByRiderIdAndRideStatusInOrderByRideIdDesc(
 			 int riderId, Collection<String> rideStatuses);
+
+	 Optional<RideDetailsEntity> findFirstByAdminIdAndRideStatusInOrderByRideIdDesc(
+			 int adminId, Collection<String> rideStatuses);
 	 
 	 
 	 // TODO need to create new column in RIDE_DETAILS table with column > createdAt

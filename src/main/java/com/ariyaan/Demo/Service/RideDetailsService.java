@@ -87,7 +87,9 @@ public class RideDetailsService {
                             "pickupLon", saved.getPickUpLongitude(),
                             "dropLat", saved.getDropLatitude(),
                             "dropLon", saved.getDropLongitude(),
-                            "fare", saved.getFare()
+                            "fare", saved.getFare(),
+                            "chassisNo", saved.getChassisNo(),
+                            "vehicleName", saved.getVehicleName()
                     )
             );
         }

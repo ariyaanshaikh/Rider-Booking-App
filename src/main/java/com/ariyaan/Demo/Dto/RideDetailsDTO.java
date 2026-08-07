@@ -1,8 +1,10 @@
 package com.ariyaan.Demo.Dto;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public class RideDetailsDTO {
 
@@ -23,6 +25,14 @@ public class RideDetailsDTO {
 	@NotNull(message = "Fare is required")
 	@Positive(message = "Fare must be positive")
 	private Double fare;
+
+	@NotBlank(message = "Chassis number is required")
+	@Size(max = 100, message = "Chassis number must be at most 100 characters")
+	private String chassisNo;
+
+	@NotBlank(message = "Vehicle name is required")
+	@Size(max = 150, message = "Vehicle name must be at most 150 characters")
+	private String vehicleName;
 
 	private int riderId;
 
@@ -82,6 +92,18 @@ public class RideDetailsDTO {
 	}
 	public void setFare(double fare) {
 		this.fare = fare;
+	}
+	public String getChassisNo() {
+		return chassisNo;
+	}
+	public void setChassisNo(String chassisNo) {
+		this.chassisNo = chassisNo;
+	}
+	public String getVehicleName() {
+		return vehicleName;
+	}
+	public void setVehicleName(String vehicleName) {
+		this.vehicleName = vehicleName;
 	}
 	public int getRiderId() {
 		return riderId;
