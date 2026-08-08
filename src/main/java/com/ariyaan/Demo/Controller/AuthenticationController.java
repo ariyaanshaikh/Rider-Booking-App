@@ -80,7 +80,14 @@ public class AuthenticationController {
 	@ResponseBody
 	public ResponseEntity<Map<String, Object>> confirmToken(
 			@RequestBody EmailOtpConfirmationRequest request) {
-		return ResponseEntity.ok(userDetailsService.confirmEmailOtp(request.getEmail(), request.getOtp()));
+		try {
+			return ResponseEntity.ok(userDetailsService.confirmEmailOtp(request.getEmail(), request.getOtp()));
+		} catch (IllegalArgumentException | IllegalStateException exception) {
+			return ResponseEntity.badRequest().body(Map.of(
+					"success", false,
+					"message", exception.getMessage()
+			));
+		}
 	}
 	
 	
