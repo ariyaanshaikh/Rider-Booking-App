@@ -1,6 +1,5 @@
 package com.ariyaan.Demo.Controller;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.ariyaan.Demo.Entity.User;
+
+import com.ariyaan.Demo.Dto.EmailOtpConfirmationRequest;
 import com.ariyaan.Demo.Service.CustomUserDetailsService;
 import com.ariyaan.Demo.Service.UserDetials;
 import com.ariyaan.Demo.config.JwtUtils;
@@ -74,19 +75,12 @@ public class AuthenticationController {
 	}
 
 	
-	// confirm token for email verification
-	@GetMapping("/confirmToken")
+	// Confirm the OTP entered in the UI. The OTP never appears in the URL.
+	@PostMapping("/confirmToken")
 	@ResponseBody
-	public Map<String, Object> confirmToken(@RequestParam("token") String token, Model model) {
-		
-		 Map<String, Object> response = new HashMap<>();
-		    if (userDetailsService.confirmToken(token)) {
-		    	response = userDetailsService.response(token);
-		    	return response;
-		    }
-		    response.put("message", "Verification Failed");
-		    return response;
-	//	return"confirmToken";
+	public ResponseEntity<Map<String, Object>> confirmToken(
+			@RequestBody EmailOtpConfirmationRequest request) {
+		return ResponseEntity.ok(userDetailsService.confirmEmailOtp(request.getEmail(), request.getOtp()));
 	}
 	
 	

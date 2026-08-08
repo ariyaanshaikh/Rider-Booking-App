@@ -143,6 +143,38 @@ public class CustomUserDetailsService implements UserDetailsService{
 	   return true;
 	 //   return "Email confirmed successfully!";
 	}
+
+	public Map<String, Object> confirmEmailOtp(String email, String otp) {
+		if (email == null || email.isBlank() || otp == null || otp.isBlank()) {
+			throw new IllegalArgumentException("email and otp are required");
+		}
+
+		User user = userRepository.findByEmailIgnoreCase(email.trim())
+				.orElseThrow(() -> new IllegalStateException("Email or OTP is invalid"));
+
+		if (!otp.trim().equals(user.getToken())) {
+			throw new IllegalStateException("Email or OTP is invalid");
+		}
+
+		if (user.getConfirmedAt() != null) {
+			throw new IllegalStateException("Email already confirmed");
+		}
+
+		LocalDateTime expiresAt = user.getExpiresAt();
+		if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now())) {
+			throw new IllegalStateException("OTP expired");
+		}
+
+		user.setConfirmedAt(LocalDateTime.now());
+		user.setEnabled(true);
+		userRepository.save(user);
+
+		Map<String, Object> response = new HashMap<>();
+		response.put("message", "OTP verified successfully");
+		response.put("token", jwtUtils.generateToken(user.getUserName()));
+		response.put("userId", user.getId());
+		return response;
+	}
 	
 	public Map<String, Object> response(String token){
 		
