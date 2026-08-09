@@ -14,9 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ariyaan.Demo.Entity.InvoiceEntity;
 import com.ariyaan.Demo.Entity.RideDetailsEntity;
 import com.ariyaan.Demo.Entity.RideRequestEntity;
+import com.ariyaan.Demo.Entity.RiderDemoEntity;
+import com.ariyaan.Demo.Entity.User;
 import com.ariyaan.Demo.Repository.InvoiceRepository;
 import com.ariyaan.Demo.Repository.RideDetailsRepository;
 import com.ariyaan.Demo.Repository.RideRequestRepository;
+import com.ariyaan.Demo.Repository.UserRepository;
 import com.ariyaan.Demo.exception.InvalidRideStatusException;
 import com.ariyaan.Demo.exception.RideNotFoundException;
 
@@ -29,19 +32,22 @@ public class RideService {
     private final SimpMessagingTemplate messagingTemplate;
     private final com.ariyaan.Demo.Repository.RiderDemoRepository riderDemoRepository;
     private final InvoiceRepository invoiceRepository;
+    private final UserRepository userRepository;
 
     public RideService(RideDetailsRepository rideDetailsRepository,
                        RideRequestRepository rideRequestRepository,
                        RiderMatchingService riderMatchingService,
                        SimpMessagingTemplate messagingTemplate,
                        com.ariyaan.Demo.Repository.RiderDemoRepository riderDemoRepository,
-                       InvoiceRepository invoiceRepository) {
+                       InvoiceRepository invoiceRepository,
+                       UserRepository userRepository) {
         this.rideDetailsRepository = rideDetailsRepository;
         this.rideRequestRepository = rideRequestRepository;
         this.riderMatchingService = riderMatchingService;
         this.messagingTemplate = messagingTemplate;
         this.riderDemoRepository = riderDemoRepository;
         this.invoiceRepository = invoiceRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -49,11 +55,34 @@ public class RideService {
      * (winner ACCEPTED, others CANCELLED) and notify user and other riders.
      */
     @Transactional
-    public boolean acceptRide(int rideId, int riderId) {
+    public boolean acceptRide(int rideId, int requestedRiderId, String username) {
+        User account = userRepository.findByUserName(username)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user was not found"));
+        RiderDemoEntity authenticatedRider = riderDemoRepository.findByUserId(account.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user is not linked to a rider profile"));
+        if (authenticatedRider.getId() != requestedRiderId) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "A rider can only accept rides for their own profile");
+        }
+
+        // Serializes concurrent accept attempts for this rider.
+        RiderDemoEntity rider = riderDemoRepository.findByIdForUpdate(authenticatedRider.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Rider profile was not found"));
+        int riderId = (int) rider.getId();
+        if (!"AVAILABLE".equals(rider.getStatus())
+                || rideDetailsRepository.existsByRiderIdAndRideStatusIn(riderId, List.of("ACCEPTED", "STARTED"))
+                || !rideRequestRepository.existsByRideIdAndRiderIdAndStatus(rideId, riderId, "SENT")) {
+            return false;
+        }
+
         int updated = rideDetailsRepository.acceptRide(rideId, riderId);
         if (updated != 1) {
             return false;
         }
+
+        // An accepted rider must immediately be excluded from further matching.
+        rider.setStatus("ON_TRIP");
+        riderDemoRepository.save(rider);
 
         RideDetailsEntity ride = rideDetailsRepository.findById(rideId).orElseThrow();
         int userId = ride.getAdminId();
@@ -114,6 +143,11 @@ public class RideService {
         ride.setRideStatus("RIDER_CANCELLED");
         ride.setRiderId(0);
         rideDetailsRepository.save(ride);
+
+        riderDemoRepository.findById((long) riderId).ifPresent(rider -> {
+            rider.setStatus("AVAILABLE");
+            riderDemoRepository.save(rider);
+        });
 
         // Notify user
         messagingTemplate.convertAndSend(
@@ -178,6 +212,10 @@ public class RideService {
 
         int riderId = ride.getRiderId();
         if (riderId > 0) {
+			riderDemoRepository.findById((long) riderId).ifPresent(rider -> {
+				rider.setStatus("AVAILABLE");
+				riderDemoRepository.save(rider);
+			});
             // notify rider
             messagingTemplate.convertAndSend(
                     "/topic/rider/" + riderId,

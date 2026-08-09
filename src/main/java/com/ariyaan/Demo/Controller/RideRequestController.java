@@ -77,9 +77,10 @@ public class RideRequestController {
 	@PreAuthorize("hasRole('RIDER')")
 	public ResponseEntity<String> acceptRide(
 			@RequestParam int rideId,
-			@RequestParam int riderId) {
+			@RequestParam int riderId,
+			org.springframework.security.core.Authentication authentication) {
 
-		boolean success = rideService.acceptRide(rideId, riderId);
+		boolean success = rideService.acceptRide(rideId, riderId, authentication.getName());
 		if (success) {
 			return ResponseEntity.ok("Ride accepted");
 		}

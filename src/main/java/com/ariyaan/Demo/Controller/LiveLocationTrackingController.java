@@ -98,9 +98,11 @@ public class LiveLocationTrackingController {
 	}
 
 	@PostMapping
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<RiderDemoEntity> createRider(@Valid @RequestBody RiderDetailsDTO riderDetails) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(riderDemoService.createRider(riderDetails));
+	@PreAuthorize("hasRole('RIDER')")
+	public ResponseEntity<RiderDemoEntity> createRider(Authentication authentication,
+			@Valid @RequestBody RiderDetailsDTO riderDetails) {
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(riderDemoService.createRider(authentication.getName(), riderDetails));
 	}
 	
 	// To livetrack the rider and show it to the admin
@@ -120,6 +122,15 @@ public class LiveLocationTrackingController {
 			Authentication authentication, @Valid @RequestBody RiderLiveLocationUpdateDTO location) {
 		return ResponseEntity.ok(liveLocationTrackingService
 				.saveAuthenticatedRiderCurrentLocation(authentication.getName(), location));
+	}
+
+	/** Rider can opt in or out of dispatch; ON_TRIP is managed by ride lifecycle. */
+	@PatchMapping("/status")
+	@PreAuthorize("hasRole('RIDER')")
+	public ResponseEntity<java.util.Map<String, Object>> updateMyStatus(
+			Authentication authentication, @org.springframework.web.bind.annotation.RequestParam String status) {
+		return ResponseEntity.ok(liveLocationTrackingService
+				.updateAuthenticatedRiderAvailability(authentication.getName(), status));
 	}
 
 	@GetMapping("/nearby")

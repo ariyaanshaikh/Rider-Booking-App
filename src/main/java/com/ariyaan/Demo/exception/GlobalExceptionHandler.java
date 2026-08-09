@@ -133,6 +133,25 @@ public class GlobalExceptionHandler {
 		return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
 	}
 
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
+		return clientError(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage());
+	}
+
+	@ExceptionHandler(IllegalStateException.class)
+	public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
+		return clientError(HttpStatus.CONFLICT, "CONFLICT", ex.getMessage());
+	}
+
+	private ResponseEntity<Map<String, Object>> clientError(HttpStatus status, String error, String message) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("timestamp", LocalDateTime.now());
+		body.put("status", status.value());
+		body.put("error", error);
+		body.put("message", message);
+		return new ResponseEntity<>(body, status);
+	}
+
 	/**
 	 * Handle generic exceptions
 	 */

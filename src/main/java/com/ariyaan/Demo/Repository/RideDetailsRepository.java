@@ -43,6 +43,7 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 	        r.rideStatus = 'ACCEPTED'
 	    WHERE r.rideId = :rideId
 	    AND (r.riderId IS NULL OR r.riderId = 0)
+	    AND r.rideStatus = 'REQUESTED'
 	""")
 	int acceptRide(@Param("rideId") int rideId, @Param("riderId") int riderId);
 
@@ -53,8 +54,10 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 
 	 List<RideDetailsEntity> findByAdminIdOrderByRideIdDesc(int adminId);
 
-	 Optional<RideDetailsEntity> findFirstByRiderIdAndRideStatusInOrderByRideIdDesc(
+	Optional<RideDetailsEntity> findFirstByRiderIdAndRideStatusInOrderByRideIdDesc(
 			 int riderId, Collection<String> rideStatuses);
+
+	boolean existsByRiderIdAndRideStatusIn(int riderId, Collection<String> rideStatuses);
 
 	 Optional<RideDetailsEntity> findFirstByAdminIdAndRideStatusInOrderByRideIdDesc(
 			 int adminId, Collection<String> rideStatuses);

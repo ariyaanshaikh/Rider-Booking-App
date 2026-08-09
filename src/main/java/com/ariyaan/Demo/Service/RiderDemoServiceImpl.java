@@ -34,18 +34,21 @@ public class RiderDemoServiceImpl implements RiderDemoService{
 	}
 
 	@Override
-	public RiderDemoEntity createRider(RiderDetailsDTO riderDetails) {
-		User account = userRepository.findById(riderDetails.getUserId())
-				.orElseThrow(() -> new IllegalArgumentException("No user found for userId " + riderDetails.getUserId()));
+	public RiderDemoEntity createRider(String username, RiderDetailsDTO riderDetails) {
+		User account = userRepository.findByUserName(username)
+				.orElseThrow(() -> new IllegalArgumentException("Authenticated user was not found"));
 		if (account.getRole() != UserRole.RIDER) {
 			throw new IllegalArgumentException("RIDER_DETAILS can only be linked to a user with role RIDER");
+		}
+		if (riderDemoRepository.findByUserId(account.getId()).isPresent()) {
+			throw new IllegalStateException("This rider account already has a rider profile");
 		}
 
 		RiderDemoEntity rider = new RiderDemoEntity();
 		rider.setName(riderDetails.getName());
 		rider.setMobile_number(riderDetails.getMobileNumber());
 		rider.setStatus(riderDetails.getStatus());
-		rider.setUserId(riderDetails.getUserId());
+		rider.setUserId(account.getId());
 		return riderDemoRepository.save(rider);
 	}
 }

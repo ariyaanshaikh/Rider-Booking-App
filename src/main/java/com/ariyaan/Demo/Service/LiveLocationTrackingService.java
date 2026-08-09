@@ -125,6 +125,23 @@ public class LiveLocationTrackingService {
 				"longitude", location.getLongitude());
 	}
 
+	/** Allows a rider to control only their own dispatch availability. */
+	public Map<String, Object> updateAuthenticatedRiderAvailability(String username, String requestedStatus) {
+		String status = requestedStatus == null ? "" : requestedStatus.trim().toUpperCase(java.util.Locale.ROOT);
+		if (!"AVAILABLE".equals(status) && !"OFFLINE".equals(status)) {
+			throw new IllegalArgumentException("Status must be AVAILABLE or OFFLINE");
+		}
+
+		RiderDemoEntity rider = findAuthenticatedRider(username);
+		if ("ON_TRIP".equals(rider.getStatus())) {
+			throw new IllegalStateException("A rider cannot change availability while an active ride is assigned");
+		}
+
+		rider.setStatus(status);
+		riderDemoRepository.save(rider);
+		return Map.of("riderId", rider.getId(), "status", status);
+	}
+
 	private RiderDemoEntity findAuthenticatedRider(String username) {
 		User account = userRepository.findByUserName(username)
 				.orElseThrow(() -> new AccessDeniedException("Authenticated account was not found"));

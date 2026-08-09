@@ -10,6 +10,7 @@ public interface RiderDemoService {
 
 	public void sendRiderDetails();
 
-	RiderDemoEntity createRider(RiderDetailsDTO riderDetails);
+	/** Creates a profile for the authenticated rider account only. */
+	RiderDemoEntity createRider(String username, RiderDetailsDTO riderDetails);
 	
 }

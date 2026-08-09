@@ -49,7 +49,7 @@ def configure_document():
     add_run(header, "Rider Booking Application | Technical Reference", size=8.5, color="666666")
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    add_run(footer, "Internal engineering reference - updated 7 August 2026", size=8.5, color="666666")
+    add_run(footer, "Internal engineering reference - updated 8 August 2026", size=8.5, color="666666")
     return doc
 
 
@@ -79,6 +79,7 @@ def cover(document):
     add_table(document, ["Implemented decision", "Current behavior"], [
         ("Account roles", "USERS.ROLE is ADMIN or RIDER. A rider profile is linked one-to-one through RIDER_DETAILS.USER_ID."),
         ("Matching", "Only VERIFIED, AVAILABLE riders with a location newer than 10 minutes and within 10 km are eligible."),
+        ("Dispatch availability", "A rider can change only their own status between AVAILABLE and OFFLINE. An accepted rider is set to ON_TRIP and cannot toggle status until the ride ends or is cancelled."),
         ("Ride OTP", "No clock expiry. It works only while the assigned ride remains ACCEPTED."),
         ("Pre-ride location", "A rider saves only latitude/longitude; the server derives the rider ID from the authenticated account."),
         ("Live tracking", "An assigned rider sends only latitude/longitude. The server derives the active ride and privately sends it to the booking admin."),
@@ -171,12 +172,13 @@ def endpoint_catalog(document):
     ], [0.62, 2.52, 1.08, 2.07], body_size=8.0)
     heading(document, "Rider, ride, and utility", 2)
     add_table(document, ["Method", "Path", "Access", "Input"], [
-        ("POST", "/rider", "ADMIN", "Rider profile JSON"),
+        ("POST", "/rider", "RIDER", "Rider profile JSON; ownership from JWT"),
         ("POST", "/rider/{riderId}/verification-details", "JWT", "KYC/bank JSON"),
         ("GET", "/rider/{riderId}/verification-details", "JWT", "Path ID"),
         ("PATCH", "/rider/{riderId}/verification?verified=", "JWT", "Boolean query"),
         ("GET", "/rider/{riderId}/history", "JWT", "Path ID"),
         ("POST", "/rider/save/location", "RIDER", "latitude/longitude JSON"),
+        ("PATCH", "/rider/status?status=", "RIDER", "AVAILABLE or OFFLINE query"),
         ("POST", "/rider/fetch/livelocation", "RIDER", "latitude/longitude JSON"),
         ("GET", "/rider/nearby?lat=&lon=", "JWT", "Coordinates query"),
         ("POST", "/ride/request", "ADMIN", "Ride JSON"),
@@ -196,14 +198,14 @@ def sequence(document):
         ("1", "Admin", "Register or identify ADMIN user", "Enabled ADMIN account; record USERS.ID and an ADMIN JWT."),
         ("2", "Rider", "Register or identify RIDER user", "Enabled RIDER account; record USERS.ID and a RIDER JWT."),
         ("2A", "Admin + Rider", "GET /api/profile/me", "Use the JWT to load the profile screen; no client-supplied ID is needed."),
-        ("3", "Admin", "POST /rider", "Create rider profile linked with userId = rider USERS.ID."),
+        ("3", "Rider", "POST /rider", "Create the rider's own profile; the server links it to the authenticated RIDER account."),
         ("4", "Admin", "POST verification details; PATCH verified=true", "Exactly one verification row for riderId; matching requires verified=true."),
         ("5", "Rider", "POST /rider/save/location", "Fresh GPS row for that rider; no ride is required."),
         ("6", "Admin", "GET /rider/nearby", "Verified AVAILABLE rider appears if within 10 km and fresh."),
         ("7", "Admin", "POST /ride/request", "New REQUESTED ride and matching RIDE_REQUEST rows."),
-        ("8", "Rider", "POST /ride/accept", "Ride becomes ACCEPTED; capture rideId and OTP."),
+        ("8", "Rider", "POST /ride/accept", "Only the authenticated, AVAILABLE rider who received the SENT request can accept; ride becomes ACCEPTED and rider becomes ON_TRIP."),
         ("9", "Admin + Rider", "Connect private WebSocket; POST /rider/fetch/livelocation", "Admin receives a private location message for the accepted ride."),
-        ("10", "Rider", "POST /ride/verify-otp", "Ride becomes STARTED and rider becomes ON_TRIP."),
+        ("10", "Rider", "POST /ride/verify-otp", "Ride becomes STARTED."),
         ("11", "Rider", "POST /ride/end", "Ride becomes COMPLETED; rider AVAILABLE; one PENDING invoice is created."),
     ], [0.48, 1.2, 2.35, 2.29], body_size=8.05)
     add_note(document, "POST /rider/save/location is for being found by matching. POST /rider/fetch/livelocation is only for an accepted/started ride and private admin tracking.")
@@ -387,12 +389,11 @@ Authorization: Bearer {{riderJwt}}''', '''200 OK
 
 def rider_tests(document):
     flow_section(document, "6. Rider profile, verification, availability, and matching")
-    endpoint_block(document, "POST", "/rider", "Bearer {{adminJwt}} — ADMIN role", "raw JSON", '''POST {{baseUrl}}/rider
-Authorization: Bearer {{adminJwt}}
+    endpoint_block(document, "POST", "/rider", "Bearer {{riderJwt}} — RIDER role", "raw JSON", '''POST {{baseUrl}}/rider
+Authorization: Bearer {{riderJwt}}
 Content-Type: application/json
 
 {
-  "userId": {{riderUserId}},
   "name": "Vijay Rider",
   "mobileNumber": "9167300000",
   "status": "AVAILABLE"
@@ -403,7 +404,7 @@ Content-Type: application/json
   "mobile_number":"9167300000",
   "status":"AVAILABLE",
   "userId":3
-}''', "userId is required, must exist in USERS, and its role must be RIDER. Copy id to {{riderId}}. USER_ID is unique, so one login account cannot own two rider profiles.")
+}''', "The request must not contain userId. The server takes the username from the rider JWT, finds that RIDER account, and stores its USERS.ID as USER_ID. Copy id to {{riderId}}. USER_ID is unique, so one login account cannot own two rider profiles; a duplicate profile request is rejected. A rider can submit only AVAILABLE or OFFLINE—ON_TRIP is controlled by the ride lifecycle.")
 
     endpoint_block(document, "POST", "/rider/{riderId}/verification-details", "Bearer JWT", "raw JSON", '''POST {{baseUrl}}/rider/{{riderId}}/verification-details
 Authorization: Bearer {{adminJwt}}
@@ -431,6 +432,13 @@ Content-Type: application/json
     endpoint_block(document, "GET", "/rider/{riderId}/verification-details", "Bearer JWT", "No body", "GET {{baseUrl}}/rider/{{riderId}}/verification-details\nAuthorization: Bearer {{adminJwt}}", "200 OK with the stored verification JSON.", "This currently exposes unmasked KYC/bank fields. Do not expose this endpoint to untrusted clients in production.")
     endpoint_block(document, "PATCH", "/rider/{riderId}/verification", "Bearer JWT", "Boolean query parameter", "PATCH {{baseUrl}}/rider/{{riderId}}/verification?verified=true\nAuthorization: Bearer {{adminJwt}}", "200 OK with the verification object where verified is true.", "Use true or false, not Y/N. Verified must be true before matching can return the rider.")
     endpoint_block(document, "GET", "/rider/{riderId}/history", "Bearer JWT", "No body", "GET {{baseUrl}}/rider/{{riderId}}/history\nAuthorization: Bearer {{riderJwt}}", "200 OK with an array of rides whose RIDER_ID equals the path value, newest ride ID first.")
+
+    endpoint_block(document, "PATCH", "/rider/status", "Bearer {{riderJwt}} — RIDER role", "status query parameter", '''PATCH {{baseUrl}}/rider/status?status=OFFLINE
+Authorization: Bearer {{riderJwt}}''', '''200 OK
+{
+  "riderId": 3,
+  "status": "OFFLINE"
+}''', "Use only AVAILABLE or OFFLINE. The server identifies the rider from the JWT, so the client cannot update another rider's status. ON_TRIP is controlled by ride acceptance/lifecycle; a rider with an active assignment cannot change availability. OFFLINE and ON_TRIP riders are excluded from matching.")
 
     endpoint_block(document, "POST", "/rider/save/location", "Bearer {{riderJwt}} — RIDER role", "raw JSON", '''POST {{baseUrl}}/rider/save/location
 Authorization: Bearer {{riderJwt}}
@@ -467,7 +475,26 @@ Content-Type: application/json
   "adminId": {{adminId}}
 }''', "200 OK with plain text: Ride Request Sent, id=2", "chassisNo and vehicleName are required and stored on RIDE_DETAILS. Copy the returned number to {{rideId}}. The server creates a 4-digit ride OTP, sets status REQUESTED, finds eligible riders, saves RIDE_REQUEST rows, and publishes RIDE_REQUEST events. Do not send rideId, riderId, rideOtp, or rideStatus in the body.")
 
-    endpoint_block(document, "POST", "/ride/accept", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/accept?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Ride accepted", "The first successful accept wins atomically. The assigned ride status becomes ACCEPTED. Other RIDE_REQUEST rows are marked CANCELLED. Current implementation sends the OTP in a RIDE_ACCEPTED public-topic event.")
+    endpoint_block(document, "POST", "/ride/accept", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/accept?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Ride accepted", "The submitted riderId must match the authenticated rider's JWT-linked RIDER_DETAILS profile. The rider must be AVAILABLE, have no ACCEPTED or STARTED ride, and have a SENT RIDE_REQUEST row for this ride. This prevents rider-ID impersonation and accepting a guessed or already-assigned ride. The first valid accept wins atomically; the winner becomes ON_TRIP and other RIDE_REQUEST rows are CANCELLED.")
+
+    heading(document, "Multiple rider requests and first-accept behavior", 2)
+    base_paragraph(document, "One ride can be sent to several eligible riders. The server creates one RIDE_REQUEST row for each rider, all with the same rideId and status SENT.", size=10.0, after=4)
+    code_block(document, '''Before any acceptance
+ride_id | rider_id | status
+42      | 3        | SENT
+42      | 7        | SENT
+42      | 12       | SENT
+
+After rider 7 accepts first
+ride_id | rider_id | status
+42      | 3        | CANCELLED
+42      | 7        | ACCEPTED
+42      | 12       | CANCELLED
+
+RIDE_DETAILS for ride 42
+RIDER_ID = 7
+RIDE_STATUS = ACCEPTED''')
+    add_note(document, "The cancellation of other candidate rows is automatic. Riders 3 and 12 also receive a RIDE_CANCELLED WebSocket event at /topic/rider/{riderId}, so their apps can remove that request immediately.")
 
     heading(document, "Private live-location WebSocket test", 2)
     base_paragraph(document, "Connect CodePen/browser as the booking ADMIN whose username matches the ride's ADMIN_ID. For ride 2 in the current test database that user is ariyaan. The rider must be assigned to a ride with status ACCEPTED or STARTED.", size=9.8, after=5)
@@ -516,7 +543,7 @@ Content-Type: application/json
 
 def completion_and_utilities(document):
     flow_section(document, "8. Ride completion, cancellation, and utility tests")
-    endpoint_block(document, "POST", "/ride/verify-otp", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/verify-otp?rideId={{rideId}}&riderId={{riderId}}&otp={{rideOtp}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: OTP Verified. Ride Started", "The ride-start OTP has no clock expiry. It is accepted only for the assigned rider while status is ACCEPTED. On success the ride becomes STARTED and the rider becomes ON_TRIP.")
+    endpoint_block(document, "POST", "/ride/verify-otp", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/verify-otp?rideId={{rideId}}&riderId={{riderId}}&otp={{rideOtp}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: OTP Verified. Ride Started", "The ride-start OTP has no clock expiry. It is accepted only for the assigned rider while status is ACCEPTED. On success the ride becomes STARTED; the rider was already made ON_TRIP when the ride was accepted.")
     endpoint_block(document, "POST", "/ride/end", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/end?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Ride ended successfully", "Only a STARTED assigned ride can end. The transaction sets the ride to COMPLETED, makes the rider AVAILABLE, and creates one INVOICES row with status PENDING and amount equal to fare.")
     endpoint_block(document, "POST", "/ride/rider-cancel", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/rider-cancel?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Rider cancellation handled and rematch attempted", "The service clears the assigned rider, notifies the booking user, marks existing requests cancelled/accepted as appropriate, and attempts to notify new eligible candidates.")
     endpoint_block(document, "POST", "/ride/cancel", "Bearer {{adminJwt}} — ADMIN role", "Query parameter", "POST {{baseUrl}}/ride/cancel?rideId={{rideId}}\nAuthorization: Bearer {{adminJwt}}", "200 OK: Ride cancelled by user/admin", "The ride becomes ADMIN_CANCELLED and all RIDE_REQUEST rows become CANCELLED. An assigned rider receives a cancellation event.")
@@ -525,8 +552,8 @@ def completion_and_utilities(document):
     heading(document, "Ride lifecycle assertions", 2)
     add_table(document, ["After action", "Database assertion", "WebSocket event"], [
         ("request", "RIDE_DETAILS.REQUESTED and RIDE_REQUEST.SENT rows", "/topic/rider/{riderId}: RIDE_REQUEST"),
-        ("accept", "RIDE_DETAILS.ACCEPTED; winning rider ID assigned", "/topic/user/{adminId}: RIDE_ACCEPTED"),
-        ("verify OTP", "RIDE_DETAILS.STARTED; rider status ON_TRIP", "/topic/ride/{rideId} and /topic/user/{adminId}: RIDE_STARTED"),
+        ("accept", "RIDE_DETAILS.ACCEPTED; winning rider ID assigned; rider ON_TRIP", "/topic/user/{adminId}: RIDE_ACCEPTED"),
+        ("verify OTP", "RIDE_DETAILS.STARTED; rider remains ON_TRIP", "/topic/ride/{rideId} and /topic/user/{adminId}: RIDE_STARTED"),
         ("end", "RIDE_DETAILS.COMPLETED; rider AVAILABLE; one PENDING invoice", "/topic/ride/{rideId} and /topic/user/{adminId}: RIDE_COMPLETED"),
     ], [1.1, 3.05, 2.1], body_size=8.0)
 
@@ -627,7 +654,7 @@ def troubleshooting(document):
         "Remove or secure GET /sendJWT. It must never issue tokens for arbitrary usernames in production.",
         "Make /login deliberately public only after confirming authentication, rate limits, and password policy; currently it is blocked by SecurityConfig.",
         "Encrypt Aadhaar, PAN, licence, and bank data at rest; redact it from logs and avoid returning it in ordinary mobile responses.",
-        "Add ownership checks to /ride/accept, /ride/verify-otp, /ride/end, and cancellation endpoints so a rider token cannot submit another rider's ID.",
+        "Ownership checks are implemented for /ride/accept. Add the same authenticated-rider ownership checks to /ride/verify-otp, /ride/end, and cancellation endpoints so a rider token cannot submit another rider's ID.",
         "Authorize subscriptions to public /topic/rider, /topic/user, and /topic/ride destinations. The live GPS destination already uses a private user queue.",
         "Store mobile JWTs in Android Keystore/iOS Keychain-backed secure storage; clear active ride data on completion or logout.",
     ])
@@ -637,7 +664,7 @@ def troubleshooting(document):
         ("Roles", "ADMIN cannot call rider location endpoints; RIDER cannot create a ride."),
         ("Matching", "Only a verified, AVAILABLE rider with a location newer than 10 minutes appears within 10 km."),
         ("Tracking", "Booking admin receives a fresh rider location at /user/queue/ride/{rideId}/location."),
-        ("Lifecycle", "A rider can accept, start with the correct OTP, and end only their assigned ride."),
+        ("Lifecycle", "A rider can accept only their own SENT request while AVAILABLE, then start with the correct OTP and end their assigned ride."),
         ("Invoice", "A completed ride produces exactly one PENDING invoice with the ride fare."),
     ], [1.45, 5.15], body_size=8.35)
 

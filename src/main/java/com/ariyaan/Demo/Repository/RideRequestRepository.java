@@ -12,4 +12,6 @@ public interface RideRequestRepository extends JpaRepository<RideRequestEntity, 
 
     List<RideRequestEntity> findByRideId(int rideId);
 
+    boolean existsByRideIdAndRiderIdAndStatus(int rideId, int riderId, String status);
+
 }
