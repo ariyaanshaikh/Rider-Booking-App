@@ -10,10 +10,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.service.annotation.PutExchange;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.ariyaan.Demo.Dto.RideDetailsDTO;
@@ -143,5 +145,13 @@ public class RideRequestController {
 		}
 		return ResponseEntity.badRequest().body("Unable to end ride");
 	}
-
+	
+	@PutMapping("/paymentCompleted")
+		public String paymentCompleted(@RequestParam int rideId,@RequestParam String paymentCompleted, @RequestBody String paymentJson) {
+			rideService.paymentCompleted(rideId,paymentCompleted,paymentJson);
+			return "Payment completed for rideId: " + rideId;
+		}
+	
 }
+
+

@@ -72,4 +72,22 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 	 void deleteOldRequests();
 	 
 	 */
+	 
+	 
+	 
+	 
+	 @Modifying
+	 @Transactional
+	 @Query("""
+	     UPDATE RideDetailsEntity r
+	     SET r.paymentCompleted = :paymentCompleted,
+	         r.paymentJson = :paymentJson
+	     WHERE r.rideId = :rideId
+	 """)
+	 int updatePaymentStatusAndJson(
+	     @Param("rideId") int rideId, 
+	     @Param("paymentCompleted") String paymentCompleted, 
+	     @Param("paymentJson") String paymentJson
+	 );
+	 
 }

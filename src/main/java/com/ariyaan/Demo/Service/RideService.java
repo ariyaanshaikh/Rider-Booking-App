@@ -341,4 +341,31 @@ public class RideService {
         return true;
     }
 
+	/*
+	  public void paymentCompleted(int rideId, String paymentCompleted, String
+	  paymentJson) { rideDetailsRepository.save(null); }
+	 */
+    
+    
+    @Transactional
+    public void paymentCompleted(int rideId, String paymentCompleted, String paymentJson) {
+        int updatedRows = rideDetailsRepository.updatePaymentStatusAndJson(rideId, paymentCompleted, paymentJson);
+        
+        if (updatedRows == 0) {
+            throw new RideNotFoundException("Ride not found with id: " + rideId);
+        }
+
+        // Optional: Notify frontend clients via WebSocket that payment has been recorded
+        messagingTemplate.convertAndSend(
+                "/topic/ride/" + rideId,
+                (Object) Map.of(
+                        "type", "PAYMENT_COMPLETED",
+                        "rideId", rideId,
+                        "paymentCompleted", paymentCompleted
+                )
+        );
+    }
+    
+    
+
 }

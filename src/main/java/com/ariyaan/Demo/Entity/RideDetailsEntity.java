@@ -1,5 +1,11 @@
 package com.ariyaan.Demo.Entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -48,6 +54,17 @@ public class RideDetailsEntity {
 	
 	@Column(name = "RIDE_STATUS")
 	private String rideStatus;
+	
+	@Column(name = "PAYMENT_COMPLETED")
+	private String paymentCompleted;
+	
+//	@Column(name = "PAYMENT_JSON")
+//	private String paymentJson;
+	
+	
+	@JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "PAYMENT_JSON", columnDefinition = "jsonb")
+    private JsonNode paymentJson;
 	
 	
 	public int getRideId() {
@@ -121,6 +138,18 @@ public class RideDetailsEntity {
 	}
 	public void setRideStatus(String rideStatus) {
 		this.rideStatus = rideStatus;
+	}
+	public String getPaymentCompleted() {
+		return paymentCompleted;
+	}
+	public void setPaymentCompleted(String paymentCompleted) {
+		this.paymentCompleted = paymentCompleted;
+	}
+	public JsonNode getPaymentJson() {
+		return paymentJson;
+	}
+	public void setPaymentJson(JsonNode paymentJson) {
+		this.paymentJson = paymentJson;
 	}
 	
 	
