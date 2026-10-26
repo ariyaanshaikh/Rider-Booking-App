@@ -65,8 +65,9 @@ public class RideRequestController {
 	 */
 	@PostMapping("/request")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<String> requestRide(@Valid @RequestBody RideDetailsDTO rideRequest) {
-		int rideId = rideDetailsService.saveRideDetials(rideRequest);
+	public ResponseEntity<String> requestRide(@Valid @RequestBody RideDetailsDTO rideRequest,
+			org.springframework.security.core.Authentication authentication) {
+		int rideId = rideDetailsService.saveRideDetials(rideRequest, authentication.getName());
 		return ResponseEntity.ok("Ride Request Sent, id=" + rideId);
 	}
 	
@@ -95,8 +96,9 @@ public class RideRequestController {
 	 */
 	@PostMapping("/rider-cancel")
 	@PreAuthorize("hasRole('RIDER')")
-	public ResponseEntity<String> riderCancel(@RequestParam int rideId, @RequestParam int riderId) {
-		rideService.riderCancel(rideId, riderId);
+	public ResponseEntity<String> riderCancel(@RequestParam int rideId, @RequestParam int riderId,
+			org.springframework.security.core.Authentication authentication) {
+		rideService.riderCancel(rideId, riderId, authentication.getName());
 		return ResponseEntity.ok("Rider cancellation handled and rematch attempted");
 	}
 
@@ -105,8 +107,9 @@ public class RideRequestController {
 	 */
 	@PostMapping("/cancel")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<String> userCancel(@RequestParam int rideId) {
-		rideService.userCancel(rideId);
+	public ResponseEntity<String> userCancel(@RequestParam int rideId,
+			org.springframework.security.core.Authentication authentication) {
+		rideService.userCancel(rideId, authentication.getName());
 		return ResponseEntity.ok("Ride cancelled by user/admin");
 	}
 	
@@ -123,11 +126,11 @@ public class RideRequestController {
 	public ResponseEntity<String> verifyOtp(
 	        @RequestParam int rideId,
 			@RequestParam int riderId,
-			@RequestParam int otp) {
+			@RequestParam int otp, org.springframework.security.core.Authentication authentication) {
 
-		boolean started = rideService.startRide(rideId, riderId, otp);
+		boolean started = rideService.startRide(rideId, riderId, otp, authentication.getName());
 		if (started) {
-			return ResponseEntity.ok("OTP Verified. Ride Started");
+			return ResponseEntity.ok("OTP verified. Payment required before ride starts");
 		}
 		return ResponseEntity.badRequest().body("Invalid OTP or ride state");
 	}
@@ -138,8 +141,9 @@ public class RideRequestController {
 	 */
 	@PostMapping("/end")
 	@PreAuthorize("hasRole('RIDER')")
-	public ResponseEntity<String> endRide(@RequestParam int rideId, @RequestParam int riderId) {
-		boolean ended = rideService.endRide(rideId, riderId);
+	public ResponseEntity<String> endRide(@RequestParam int rideId, @RequestParam int riderId,
+			org.springframework.security.core.Authentication authentication) {
+		boolean ended = rideService.endRide(rideId, riderId, authentication.getName());
 		if (ended) {
 			return ResponseEntity.ok("Ride ended successfully");
 		}
@@ -148,8 +152,8 @@ public class RideRequestController {
 	
 	@PutMapping("/paymentCompleted")
 		public String paymentCompleted(@RequestParam int rideId,@RequestParam String paymentCompleted, @RequestBody String paymentJson) {
-			rideService.paymentCompleted(rideId,paymentCompleted,paymentJson);
-			return "Payment completed for rideId: " + rideId;
+			throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.GONE,
+				"Use Razorpay verification; client-supplied payment status is disabled");
 		}
 	
 }

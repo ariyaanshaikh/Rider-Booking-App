@@ -19,6 +19,9 @@ import com.ariyaan.Demo.Entity.RiderLocationEntity;
 
 @Repository
 public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity, Integer>{
+	@org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+	@Query("select r from RideDetailsEntity r where r.rideId=:rideId")
+	Optional<RideDetailsEntity> findByIdForUpdate(@Param("rideId") int rideId);
 
 //	public void save(RiderDemoEntity riderDetial);
 	
@@ -76,18 +79,5 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 	 
 	 
 	 
-	 @Modifying
-	 @Transactional
-	 @Query("""
-	     UPDATE RideDetailsEntity r
-	     SET r.paymentCompleted = :paymentCompleted,
-	         r.paymentJson = :paymentJson
-	     WHERE r.rideId = :rideId
-	 """)
-	 int updatePaymentStatusAndJson(
-	     @Param("rideId") int rideId, 
-	     @Param("paymentCompleted") String paymentCompleted, 
-	     @Param("paymentJson") String paymentJson
-	 );
 	 
 }

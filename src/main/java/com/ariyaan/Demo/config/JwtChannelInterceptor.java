@@ -66,7 +66,7 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                 String username = jwtUtils.extractUsername(token);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                if (!jwtUtils.validateToken(token, userDetails)) {
+                if (!userDetails.isEnabled() || !jwtUtils.validateToken(token, userDetails)) {
                     throw new AccessDeniedException("WebSocket token is invalid or expired");
                 }
 

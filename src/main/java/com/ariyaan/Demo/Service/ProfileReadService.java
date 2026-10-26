@@ -26,7 +26,7 @@ import com.ariyaan.Demo.Repository.UserRepository;
 @Service
 public class ProfileReadService {
 
-    private static final Collection<String> ACTIVE_RIDE_STATUSES = List.of("ACCEPTED", "STARTED");
+    private static final Collection<String> ACTIVE_RIDE_STATUSES = List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED");
 
     private final UserRepository userRepository;
     private final RiderDemoRepository riderRepository;
@@ -164,6 +164,8 @@ public class ProfileReadService {
         response.put("dropLatitude", ride.getDropLatitude());
         response.put("dropLongitude", ride.getDropLongitude());
         response.put("fare", ride.getFare());
+        response.put("distanceMeters", ride.getDistanceMeters());
+        response.put("paymentStatus", ride.getPaymentCompleted());
 		response.put("chassisNo", ride.getChassisNo());
 		response.put("vehicleName", ride.getVehicleName());
         response.put("riderId", ride.getRiderId());

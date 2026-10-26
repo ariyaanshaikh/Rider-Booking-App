@@ -27,6 +27,12 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+        // Razorpay authenticates webhooks with HMAC over the untouched request body.
+        if ("/api/payments/razorpay/webhook".equals(request.getServletPath())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         
         String authHeader = request.getHeader("Authorization");
         String token = null;
@@ -34,11 +40,20 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            username = jwtUtils.extractUsername(token);
+            try { username = jwtUtils.extractUsername(token); }
+            catch (io.jsonwebtoken.JwtException | IllegalArgumentException ex) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired JWT");
+                return;
+            }
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            UserDetails userDetails;
+            try { userDetails = userDetailsService.loadUserByUsername(username); }
+            catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED); return;
+            }
+            if (!userDetails.isEnabled()) { response.sendError(HttpServletResponse.SC_UNAUTHORIZED); return; }
             if (jwtUtils.validateToken(token, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());

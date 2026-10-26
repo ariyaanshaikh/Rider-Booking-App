@@ -58,7 +58,8 @@ public class SecurityConfig {
                 // SockJS performs its HTTP handshake before the STOMP CONNECT
                 // frame can carry a JWT. The CONNECT frame itself is validated
                 // by JwtChannelInterceptor.
-                .requestMatchers("/register/**", "/otp/**", "/demo", "/health", "/error", "/sendJWT", "/ws/**").permitAll()
+                .requestMatchers("/sendJWT", "/otp/**", "/demo").denyAll()
+                .requestMatchers("/register/**", "/login", "/health", "/error", "/ws/**", "/payment-checkout.html", "/api/payments/razorpay/webhook").permitAll()
                 .anyRequest().authenticated()
             )
             // Tell Spring not to create sessions

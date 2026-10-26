@@ -21,6 +21,20 @@ import java.util.Map;
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
+	@ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+		org.springframework.web.bind.ServletRequestBindingException.class})
+	public ResponseEntity<Map<String,Object>> handleMalformedRequest(Exception ex) {
+		return clientError(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Required request body, header or parameter is missing or invalid");
+	}
+	@ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+	public ResponseEntity<Map<String,Object>> handleWrongMethod(Exception ex) {
+		return clientError(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "HTTP method is not supported for this endpoint");
+	}
+	@ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+	public ResponseEntity<Map<String, Object>> handleResponseStatus(org.springframework.web.server.ResponseStatusException ex) {
+		return ResponseEntity.status(ex.getStatusCode()).body(Map.of("status", ex.getStatusCode().value(),
+			"error", "REQUEST_FAILED", "message", ex.getReason() == null ? "Request failed" : ex.getReason()));
+	}
 
 	private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 

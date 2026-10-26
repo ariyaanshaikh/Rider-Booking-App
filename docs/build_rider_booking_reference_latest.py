@@ -150,7 +150,7 @@ def endpoint_catalog(document):
     add_table(document, ["Method", "Path", "Access", "Input"], [
         ("GET", "/register", "Public", "None; registration HTML"),
         ("POST", "/register", "Public", "User JSON; role required"),
-        ("GET", "/register/confirmToken", "Public", "token query"),
+        ("POST", "/register/confirmToken", "Public", "email and otp JSON"),
         ("GET", "/register/verifyEmail", "Public", "emailAddress query"),
         ("POST", "/register/updateUser", "Public", "legacy form fields"),
         ("GET", "/demo", "Public", "None; demo only"),
@@ -185,6 +185,7 @@ def endpoint_catalog(document):
         ("POST", "/ride/accept?rideId=&riderId=", "RIDER", "Query IDs"),
         ("POST", "/ride/verify-otp?rideId=&riderId=&otp=", "RIDER", "Query IDs + OTP"),
         ("POST", "/ride/end?rideId=&riderId=", "RIDER", "Query IDs"),
+        ("PUT", "/ride/paymentCompleted?rideId=&paymentCompleted=", "JWT", "Payment JSON body"),
         ("POST", "/ride/rider-cancel?rideId=&riderId=", "RIDER", "Query IDs"),
         ("POST", "/ride/cancel?rideId=", "ADMIN", "Query ID"),
         ("GET", "/api/fare/calculate", "JWT", "sLat, sLon, dLat, dLon query"),
@@ -231,12 +232,18 @@ Content-Type: application/json
   "message": "Please confirm your email address"
 }''', "For a rider use role: RIDER. Only ADMIN and RIDER are valid. The API response does not return the created database user ID; read it from USERS for test setup.")
 
-    endpoint_block(document, "GET", "/register/confirmToken", "None (public)", "Query parameter", "GET {{baseUrl}}/register/confirmToken?token={{verificationToken}}", '''200 OK on a valid token
+    endpoint_block(document, "POST", "/register/confirmToken", "None (public)", "raw JSON", '''POST {{baseUrl}}/register/confirmToken
+Content-Type: application/json
+
 {
-  "message": "OTP verified Successfully",
+  "email": "admin@example.com",
+  "otp": "{{verificationOtp}}"
+}''', '''200 OK on a valid OTP
+{
+  "message": "OTP verified successfully",
   "token": "<JWT>",
   "userId": 3
-}''', "Confirmation enables the account and returns its USERS.ID as userId. The returned token subject is USERS.USER_NAME. Store userId only for UI/display; protected APIs derive ownership from the JWT.")
+}''', "Confirmation enables the account and returns its USERS.ID as userId. The returned token subject is USERS.USER_NAME. Send the OTP in the JSON body, never in a URL query parameter: URLs may be stored in browser history, proxy logs, and analytics. Store userId only for UI/display; protected APIs derive ownership from the JWT.")
 
     endpoint_block(document, "GET", "/register/verifyEmail", "None (public)", "Query parameter", "GET {{baseUrl}}/register/verifyEmail?emailAddress=admin@example.com", '''Existing email:
 {"success":true,"message":"A confirmation email has been requested"}
@@ -545,6 +552,15 @@ def completion_and_utilities(document):
     flow_section(document, "8. Ride completion, cancellation, and utility tests")
     endpoint_block(document, "POST", "/ride/verify-otp", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/verify-otp?rideId={{rideId}}&riderId={{riderId}}&otp={{rideOtp}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: OTP Verified. Ride Started", "The ride-start OTP has no clock expiry. It is accepted only for the assigned rider while status is ACCEPTED. On success the ride becomes STARTED; the rider was already made ON_TRIP when the ride was accepted.")
     endpoint_block(document, "POST", "/ride/end", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/end?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Ride ended successfully", "Only a STARTED assigned ride can end. The transaction sets the ride to COMPLETED, makes the rider AVAILABLE, and creates one INVOICES row with status PENDING and amount equal to fare.")
+    endpoint_block(document, "PUT", "/ride/paymentCompleted", "Bearer JWT — any authenticated user", "rideId and paymentCompleted query parameters; raw JSON body", '''PUT {{baseUrl}}/ride/paymentCompleted?rideId={{rideId}}&paymentCompleted=COMPLETED
+Authorization: Bearer {{adminJwt}}
+Content-Type: application/json
+
+{
+  "provider": "example-provider",
+  "paymentId": "pay_123456",
+  "amount": 250.00
+}''', "200 OK: Payment completed for rideId: {{rideId}}", "Stores paymentCompleted in RIDE_DETAILS.PAYMENT_COMPLETED and the request body in RIDE_DETAILS.PAYMENT_JSON, then publishes PAYMENT_COMPLETED to /topic/ride/{rideId}. The current implementation requires a valid JWT through SecurityConfig but has no endpoint role or ownership check, does not validate the payment status/body, and can update any existing ride. Restrict this endpoint before accepting real payment-provider callbacks.")
     endpoint_block(document, "POST", "/ride/rider-cancel", "Bearer {{riderJwt}} — RIDER role", "Query parameters", "POST {{baseUrl}}/ride/rider-cancel?rideId={{rideId}}&riderId={{riderId}}\nAuthorization: Bearer {{riderJwt}}", "200 OK: Rider cancellation handled and rematch attempted", "The service clears the assigned rider, notifies the booking user, marks existing requests cancelled/accepted as appropriate, and attempts to notify new eligible candidates.")
     endpoint_block(document, "POST", "/ride/cancel", "Bearer {{adminJwt}} — ADMIN role", "Query parameter", "POST {{baseUrl}}/ride/cancel?rideId={{rideId}}\nAuthorization: Bearer {{adminJwt}}", "200 OK: Ride cancelled by user/admin", "The ride becomes ADMIN_CANCELLED and all RIDE_REQUEST rows become CANCELLED. An assigned rider receives a cancellation event.")
     endpoint_block(document, "GET", "/api/fare/calculate", "Bearer JWT", "Query parameters", "GET {{baseUrl}}/api/fare/calculate?sLat=19.0760&sLon=72.8777&dLat=19.1100&dLon=72.9000\nAuthorization: Bearer {{adminJwt}}", "200 OK with the current plain-text distance/fare placeholder response.", "The present fare output is not a production pricing calculation. Do not use it for invoice amounts or payments.")
@@ -555,6 +571,7 @@ def completion_and_utilities(document):
         ("accept", "RIDE_DETAILS.ACCEPTED; winning rider ID assigned; rider ON_TRIP", "/topic/user/{adminId}: RIDE_ACCEPTED"),
         ("verify OTP", "RIDE_DETAILS.STARTED; rider remains ON_TRIP", "/topic/ride/{rideId} and /topic/user/{adminId}: RIDE_STARTED"),
         ("end", "RIDE_DETAILS.COMPLETED; rider AVAILABLE; one PENDING invoice", "/topic/ride/{rideId} and /topic/user/{adminId}: RIDE_COMPLETED"),
+        ("paymentCompleted", "RIDE_DETAILS.PAYMENT_COMPLETED and PAYMENT_JSON updated", "/topic/ride/{rideId}: PAYMENT_COMPLETED"),
     ], [1.1, 3.05, 2.1], body_size=8.0)
 
 
@@ -603,7 +620,7 @@ def database_and_migrations(document):
         ("RIDER_DETAILS", "Operational rider profile", "USER_ID is UNIQUE FK to USERS.ID; status AVAILABLE / ON_TRIP / OFFLINE."),
         ("RIDER_VERIFICATION_DETAILS", "KYC/bank record", "RIDER_ID is PK + FK to RIDER_DETAILS.ID; exactly one record per rider."),
         ("RIDER_LOCATION", "Current GPS point", "RIDER_ID is PK + FK; atomic upsert means one row per rider."),
-        ("RIDE_DETAILS", "Booking and lifecycle", "RIDE_ID PK; vehicle name, chassis no., rider/admin IDs, OTP, status."),
+        ("RIDE_DETAILS", "Booking, lifecycle, and payment receipt", "RIDE_ID PK; vehicle name, chassis no., rider/admin IDs, OTP, status, PAYMENT_COMPLETED, and PAYMENT_JSON (jsonb)."),
         ("RIDE_REQUEST", "Matching candidates", "Unique (RIDE_ID, RIDER_ID) avoids duplicate candidate notification rows."),
         ("INVOICES", "Completion invoice", "RIDE_ID is unique, so only one invoice can exist per ride."),
     ], [1.85, 2.15, 2.25], body_size=8.2)
@@ -619,7 +636,7 @@ def database_and_migrations(document):
         ("V8", "Add USERS.ROLE with ADMIN/RIDER check; existing users default to ADMIN."),
         ("V9", "Add RIDE_DETAILS.CHASSIS_NO and VEHICLE_NAME for ride-request vehicle details."),
     ], [0.8, 5.45], body_size=8.5)
-    add_note(document, "Render is configured with Flyway disabled in production. Apply V7, V8, and V9 manually to the Render-connected Neon branch before deploying code that references USERS.ROLE, RIDER_DETAILS.USER_ID, CHASSIS_NO, or VEHICLE_NAME.")
+    add_note(document, "Render is configured with Flyway disabled in production. Apply V7, V8, and V9 manually to the Render-connected Neon branch before deploying code that references USERS.ROLE, RIDER_DETAILS.USER_ID, CHASSIS_NO, or VEHICLE_NAME. The payment endpoint additionally requires RIDE_DETAILS.PAYMENT_COMPLETED (text) and RIDE_DETAILS.PAYMENT_JSON (jsonb); there is currently no migration file for those columns.")
     heading(document, "Useful database validation queries", 2)
     code_block(document, '''-- Confirm account role and rider mapping
 SELECT u.id, u.user_name, u.role, r.id AS rider_id, r.status

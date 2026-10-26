@@ -25,17 +25,22 @@ public class RideDetailsService {
     private final RiderMatchingService riderMatchingService;
     private final RideRequestRepository rideRequestRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final DistanceService distanceService;
+    private final com.ariyaan.Demo.Repository.UserRepository users;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
     public RideDetailsService(RideDetailsRepository rideDetailsRepository,
                               RiderMatchingService riderMatchingService,
                               RideRequestRepository rideRequestRepository,
-                              SimpMessagingTemplate messagingTemplate) {
+                              SimpMessagingTemplate messagingTemplate, DistanceService distanceService,
+                              com.ariyaan.Demo.Repository.UserRepository users) {
         this.rideDetailsRepository = rideDetailsRepository;
         this.riderMatchingService = riderMatchingService;
         this.rideRequestRepository = rideRequestRepository;
         this.messagingTemplate = messagingTemplate;
+        this.distanceService = distanceService;
+        this.users = users;
     }
 
     /**
@@ -44,9 +49,23 @@ public class RideDetailsService {
      * Returns the generated ride id.
      */
     @Transactional
-    public int saveRideDetials(RideDetailsDTO rideRequest) {
+    public int saveRideDetials(RideDetailsDTO rideRequest, String username) {
         RideDetailsEntity rideDetailsEntity = new RideDetailsEntity();
-        BeanUtils.copyProperties(rideRequest, rideDetailsEntity);
+        rideDetailsEntity.setPickUpLatitude(rideRequest.getPickUpLatitude());
+        rideDetailsEntity.setPickUpLongitude(rideRequest.getPickUpLongitude());
+        rideDetailsEntity.setDropLatitude(rideRequest.getDropLatitude());
+        rideDetailsEntity.setDropLongitude(rideRequest.getDropLongitude());
+        rideDetailsEntity.setChassisNo(rideRequest.getChassisNo());
+        rideDetailsEntity.setVehicleName(rideRequest.getVehicleName());
+        var account = users.findByUserName(username).orElseThrow();
+        rideDetailsEntity.setRideId(0);
+        rideDetailsEntity.setAdminId(Math.toIntExact(account.getId()));
+        rideDetailsEntity.setRiderId(0);
+        long meters = distanceService.getDistanceMeters(rideRequest.getPickUpLatitude(), rideRequest.getPickUpLongitude(),
+                rideRequest.getDropLatitude(), rideRequest.getDropLongitude());
+        rideDetailsEntity.setDistanceMeters(meters);
+        rideDetailsEntity.setFare(java.math.BigDecimal.valueOf(FarePolicy.quote(meters).amountPaise(), 2).doubleValue());
+        rideDetailsEntity.setPaymentCompleted("PENDING");
 
         int otp = 1000 + secureRandom.nextInt(9000);
         rideDetailsEntity.setRideOtp(otp);

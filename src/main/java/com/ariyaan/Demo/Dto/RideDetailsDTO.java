@@ -22,8 +22,7 @@ public class RideDetailsDTO {
 	@NotNull(message = "Drop longitude is required")
 	private Double dropLongitude;
 
-	@NotNull(message = "Fare is required")
-	@Positive(message = "Fare must be positive")
+	/** Legacy input is ignored; the server calculates the fare from Google distance. */
 	private Double fare;
 
 	@NotBlank(message = "Chassis number is required")
@@ -36,7 +35,7 @@ public class RideDetailsDTO {
 
 	private int riderId;
 
-	@NotNull(message = "Admin ID (User ID) is required")
+	/** Legacy input is ignored; the authenticated ADMIN owns the booking. */
 	private Integer adminId;
 
 	private long rideOtp;

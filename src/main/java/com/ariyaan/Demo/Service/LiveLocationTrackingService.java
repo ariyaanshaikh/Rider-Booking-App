@@ -86,7 +86,7 @@ public class LiveLocationTrackingService {
 
 		RideDetailsEntity ride = rideDetailsRepository
 				.findFirstByRiderIdAndRideStatusInOrderByRideIdDesc((int) rider.getId(),
-						List.of("ACCEPTED", "STARTED"))
+						List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED"))
 				.orElseThrow(() -> new AccessDeniedException("No active ride is assigned to this rider"));
 
 		User bookingUser = userRepository.findById((long) ride.getAdminId())
@@ -126,14 +126,17 @@ public class LiveLocationTrackingService {
 	}
 
 	/** Allows a rider to control only their own dispatch availability. */
+	@org.springframework.transaction.annotation.Transactional
 	public Map<String, Object> updateAuthenticatedRiderAvailability(String username, String requestedStatus) {
 		String status = requestedStatus == null ? "" : requestedStatus.trim().toUpperCase(java.util.Locale.ROOT);
 		if (!"AVAILABLE".equals(status) && !"OFFLINE".equals(status)) {
 			throw new IllegalArgumentException("Status must be AVAILABLE or OFFLINE");
 		}
 
-		RiderDemoEntity rider = findAuthenticatedRider(username);
-		if ("ON_TRIP".equals(rider.getStatus())) {
+		RiderDemoEntity owned = findAuthenticatedRider(username);
+		RiderDemoEntity rider = riderDemoRepository.findByIdForUpdate(owned.getId()).orElseThrow();
+		if ("ON_TRIP".equals(rider.getStatus()) || rideDetailsRepository.existsByRiderIdAndRideStatusIn(
+				(int)rider.getId(), List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED"))) {
 			throw new IllegalStateException("A rider cannot change availability while an active ride is assigned");
 		}
 

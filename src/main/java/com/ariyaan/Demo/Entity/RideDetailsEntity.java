@@ -37,6 +37,11 @@ public class RideDetailsEntity {
 	@Column(name = "FARE")
 	private double fare;
 
+	@Column(name = "DISTANCE_METERS")
+	private Long distanceMeters;
+	public Long getDistanceMeters() { return distanceMeters; }
+	public void setDistanceMeters(Long value) { distanceMeters = value; }
+
 	@Column(name = "CHASSIS_NO")
 	private String chassisNo;
 

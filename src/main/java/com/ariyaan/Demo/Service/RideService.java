@@ -33,6 +33,7 @@ public class RideService {
     private final com.ariyaan.Demo.Repository.RiderDemoRepository riderDemoRepository;
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
+    private final RidePaymentStore paymentStore;
 
     public RideService(RideDetailsRepository rideDetailsRepository,
                        RideRequestRepository rideRequestRepository,
@@ -40,7 +41,7 @@ public class RideService {
                        SimpMessagingTemplate messagingTemplate,
                        com.ariyaan.Demo.Repository.RiderDemoRepository riderDemoRepository,
                        InvoiceRepository invoiceRepository,
-                       UserRepository userRepository) {
+                       UserRepository userRepository, RidePaymentStore paymentStore) {
         this.rideDetailsRepository = rideDetailsRepository;
         this.rideRequestRepository = rideRequestRepository;
         this.riderMatchingService = riderMatchingService;
@@ -48,6 +49,7 @@ public class RideService {
         this.riderDemoRepository = riderDemoRepository;
         this.invoiceRepository = invoiceRepository;
         this.userRepository = userRepository;
+        this.paymentStore = paymentStore;
     }
 
     /**
@@ -70,7 +72,7 @@ public class RideService {
                 .orElseThrow(() -> new IllegalArgumentException("Rider profile was not found"));
         int riderId = (int) rider.getId();
         if (!"AVAILABLE".equals(rider.getStatus())
-                || rideDetailsRepository.existsByRiderIdAndRideStatusIn(riderId, List.of("ACCEPTED", "STARTED"))
+                || rideDetailsRepository.existsByRiderIdAndRideStatusIn(riderId, List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED"))
                 || !rideRequestRepository.existsByRideIdAndRiderIdAndStatus(rideId, riderId, "SENT")) {
             return false;
         }
@@ -130,8 +132,11 @@ public class RideService {
      * then attempt to rematch next nearest riders (excluding already-notified ones).
      */
     @Transactional
-    public void riderCancel(int rideId, int riderId) {
-        RideDetailsEntity ride = rideDetailsRepository.findById(rideId).orElseThrow();
+    public void riderCancel(int rideId, int riderId, String username) {
+        requireRider(username, riderId);
+        RideDetailsEntity ride = rideDetailsRepository.findByIdForUpdate(rideId).orElseThrow();
+        if (!"ACCEPTED".equals(ride.getRideStatus()))
+            throw new IllegalStateException("Rider cancellation is allowed before OTP verification only; contact support after payment begins");
 
         // Only proceed if this rider was the assigned rider
         if (ride.getRiderId() != riderId) {
@@ -205,8 +210,13 @@ public class RideService {
      * Handle user/admin cancellation. Mark ride ADMIN_CANCELLED and notify assigned rider (if any).
      */
     @Transactional
-    public void userCancel(int rideId) {
-        RideDetailsEntity ride = rideDetailsRepository.findById(rideId).orElseThrow();
+    public void userCancel(int rideId, String username) {
+        RideDetailsEntity ride = rideDetailsRepository.findByIdForUpdate(rideId).orElseThrow();
+        var account = userRepository.findByUserName(username).orElseThrow();
+        if (account.getId() != ride.getAdminId())
+            throw new org.springframework.security.access.AccessDeniedException("Only the booking admin can cancel this ride");
+        if (!List.of("REQUESTED", "ACCEPTED").contains(ride.getRideStatus()))
+            throw new IllegalStateException("Cancellation after OTP verification requires support and payment reconciliation");
         ride.setRideStatus("ADMIN_CANCELLED");
         rideDetailsRepository.save(ride);
 
@@ -235,13 +245,15 @@ public class RideService {
     }
 
     @Transactional
-    public boolean startRide(int rideId, int riderId, int otp) {
-        RideDetailsEntity ride = rideDetailsRepository.findById(rideId)
+    public boolean startRide(int rideId, int riderId, int otp, String username) {
+        requireRider(username, riderId);
+        RideDetailsEntity ride = rideDetailsRepository.findByIdForUpdate(rideId)
                 .orElseThrow(() -> new RideNotFoundException("Ride not found with id: " + rideId));
 
         if (ride.getRiderId() != riderId) {
             throw new InvalidRideStatusException("Rider is not assigned to this ride");
         }
+        if ("AWAITING_PAYMENT".equals(ride.getRideStatus()) && ride.getRideOtp() == otp) return true;
         if (!"ACCEPTED".equals(ride.getRideStatus())) {
             throw new InvalidRideStatusException("Ride status must be ACCEPTED to start");
         }
@@ -250,7 +262,7 @@ public class RideService {
             throw new InvalidRideStatusException("OTP is incorrect");
         }
 
-        ride.setRideStatus("STARTED");
+        ride.setRideStatus("AWAITING_PAYMENT");
         rideDetailsRepository.save(ride);
 
         // mark rider ON_TRIP
@@ -263,7 +275,7 @@ public class RideService {
         messagingTemplate.convertAndSend(
                 "/topic/ride/" + rideId,
                 (Object) Map.of(
-                        "type", "RIDE_STARTED",
+                        "type", "PAYMENT_REQUIRED",
                         "rideId", rideId
                 )
         );
@@ -271,7 +283,7 @@ public class RideService {
         messagingTemplate.convertAndSend(
                 "/topic/user/" + ride.getAdminId(),
                 (Object) Map.of(
-                        "type", "RIDE_STARTED",
+                        "type", "PAYMENT_REQUIRED",
                         "rideId", rideId
                 )
         );
@@ -284,14 +296,16 @@ public class RideService {
      * Invoice is marked as PENDING for settlement (payment processing can be done async).
      */
     @Transactional
-    public boolean endRide(int rideId, int riderId) {
-        RideDetailsEntity ride = rideDetailsRepository.findById(rideId)
+    public boolean endRide(int rideId, int riderId, String username) {
+        requireRider(username, riderId);
+        RideDetailsEntity ride = rideDetailsRepository.findByIdForUpdate(rideId)
                 .orElseThrow(() -> new RideNotFoundException("Ride not found with id: " + rideId));
         
         if (ride.getRiderId() != riderId) {
             throw new InvalidRideStatusException("Rider is not assigned to this ride");
         }
-        if (!"STARTED".equals(ride.getRideStatus())) {
+        if ("COMPLETED".equals(ride.getRideStatus())) return true;
+        if (!"STARTED".equals(ride.getRideStatus()) || !paymentStore.isCaptured(rideId)) {
             throw new InvalidRideStatusException("Ride status must be STARTED to end");
         }
 
@@ -300,6 +314,7 @@ public class RideService {
         rideDetailsRepository.save(ride);
 
         // Mark rider AVAILABLE
+        paymentStore.enqueueCompleted(rideId);
         riderDemoRepository.findById((long) riderId).ifPresent(r -> {
             r.setStatus("AVAILABLE");
             riderDemoRepository.save(r);
@@ -313,7 +328,7 @@ public class RideService {
                 ride.getAdminId(),  // userId
                 ride.getFare(),     // amount
                 LocalDateTime.now(),
-                "PENDING"           // status: awaiting payment/settlement
+                "PAID"              // customer payment captured; rider transfer tracked separately
         );
         invoiceRepository.save(invoice);
 
@@ -347,23 +362,11 @@ public class RideService {
 	 */
     
     
-    @Transactional
-    public void paymentCompleted(int rideId, String paymentCompleted, String paymentJson) {
-        int updatedRows = rideDetailsRepository.updatePaymentStatusAndJson(rideId, paymentCompleted, paymentJson);
-        
-        if (updatedRows == 0) {
-            throw new RideNotFoundException("Ride not found with id: " + rideId);
-        }
-
-        // Optional: Notify frontend clients via WebSocket that payment has been recorded
-        messagingTemplate.convertAndSend(
-                "/topic/ride/" + rideId,
-                (Object) Map.of(
-                        "type", "PAYMENT_COMPLETED",
-                        "rideId", rideId,
-                        "paymentCompleted", paymentCompleted
-                )
-        );
+    private void requireRider(String username, int riderId) {
+        var account = userRepository.findByUserName(username).orElseThrow();
+        var rider = riderDemoRepository.findByUserId(account.getId()).orElseThrow();
+        if (rider.getId() != riderId)
+            throw new org.springframework.security.access.AccessDeniedException("A rider can act only for their own profile");
     }
     
     

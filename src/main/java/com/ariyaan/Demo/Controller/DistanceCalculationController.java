@@ -21,13 +21,13 @@ public class DistanceCalculationController {
     
 
     @GetMapping("/calculate")
-    public String calculateFare(
+    public com.ariyaan.Demo.Service.FarePolicy.Quote calculateFare(
             @RequestParam double sLat, @RequestParam double sLon,
             @RequestParam double dLat, @RequestParam double dLon) {
         
     	
     // using goole map	
-    String distance = distanceService.getDistance(sLat, sLon, dLat, dLon);
+    long distance = distanceService.getDistanceMeters(sLat, sLon, dLat, dLon);
     
     // using free map
      //   double distance = DistanceCalculationService.getDistanceInKm(sLat, sLon, dLat, dLon);
@@ -35,6 +35,6 @@ public class DistanceCalculationController {
         // Simple Pricing Logic: 50 base + 12 per km
       //  double totalFare = 50 + (distance * 12);
         
-        return String.format("Distance: %.2s km | Total Fare: ₹%.2s", distance, "Need to Calculate the fare");
+        return com.ariyaan.Demo.Service.FarePolicy.quote(distance);
     }
 }

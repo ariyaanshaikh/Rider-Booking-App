@@ -14,9 +14,12 @@ import java.util.function.Function;
 @Component
 public class JwtUtils {
 
-    // IMPORTANT: In production, move this to application.properties
-    private static final String SECRET_KEY = "CALU781HAIYVW41729KNGSIU182G36BHJ";
-    private final Key key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+    private final Key key;
+    public JwtUtils(@org.springframework.beans.factory.annotation.Value("${app.jwt.secret}") String secret) {
+        if (secret == null || secret.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 32)
+            throw new IllegalStateException("JWT_SECRET must contain at least 32 bytes");
+        key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
