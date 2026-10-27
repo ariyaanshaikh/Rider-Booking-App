@@ -3,11 +3,37 @@ services:
     name: rider-booking-api
     runtime: docker
     plan: free
+    # Testing only: approve/select an always-on paid instance before production.
+    # Do not change the live plan without the account owner's approval.
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      - key: JWT_SECRET
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: APP_PUBLIC_BASE_URL
+        sync: false
+      - key: APP_OPERATIONS_USERNAMES
+        sync: false
+      - key: APP_SHARED_MESSAGING_ENABLED
+        value: 'true'
+      - key: EXPO_PUSH_ENABLED
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+      - key: APP_MAIL_FROM
+        sync: false
+      - key: SPRING_MAIL_HOST
+        sync: false
+      - key: SPRING_MAIL_PORT
+        sync: false
+      - key: RAZORPAY_ENABLED
+        value: 'false'
+      - key: RAZORPAY_ROUTE_ENABLED
+        value: 'false'
       - key: SPRING_DATASOURCE_URL
         sync: false
       - key: SPRING_DATASOURCE_USERNAME
