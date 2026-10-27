@@ -1,6 +1,6 @@
 # Working Render baseline — 2026-10-27
 
-This record preserves the identified working version before production preparation. It is **not a full infrastructure/database backup**. No deploy, restart, environment-variable update, branch change or plan change was performed.
+This record preserves the identified working version before production preparation. Source recovery copies and a Neon database recovery branch are now saved. This is **not a full infrastructure or independent offline database backup**. No live deploy, restart, environment-variable update, source-branch switch or plan change was performed.
 
 ## Confirmed working deployment
 
@@ -31,7 +31,24 @@ Render's current rollback documentation says retained build artifacts can be reu
 
 Render rollback reuses the target deploy's build artifact, start command, environment values and certain other settings, subject to documented environment-group behavior. It does not roll back database contents/migrations, disks or the compute plan. Confirm artifact availability and database compatibility before any rollback. No rollback has been triggered.
 
-The confirmed workspace lists **no Render-managed PostgreSQL instances**. The actual application database provider/host and a secure connection or provider backup route must be identified before a consistent database export and isolated restoration rehearsal can be completed. A healthy API is not evidence that a database backup exists.
+## Neon database recovery branch
+
+The owner confirmed the working Render app uses Neon project **Rider Booking APP** (`muddy-band-52686480`), branch **render-test** (`br-restless-glitter-ay2vs05j`). The separate Neon branch named production is not the confirmed live database and was not changed.
+
+A normal data-bearing recovery branch was created from render-test, without a compute endpoint:
+
+- Name: `backup-render-working-2026-10-27`.
+- Branch ID: `br-curly-flower-ay1tcwie`.
+- Parent branch: `br-restless-glitter-ay2vs05j`.
+- Parent cut point: `2026-10-27T08:29:00Z` (13:59:00 India time).
+- Parent LSN: `0/6A14BA8`.
+- Branch created: `2026-10-27T08:29:25Z`.
+- Verified state: `ready` via a separate get-branch call.
+- Created with `no_compute: true`; no extra database server was started. Provider storage allowances/billing still apply. No automatic expiration was set; retain until explicitly released by the owner.
+
+This recovery branch holds the schema and data at its cut point. New writes to the working branch are not included. Keep it unused: do not point test workloads at the recovery branch or apply migrations to it. For a restoration rehearsal, create a separate disposable branch from this saved branch, then validate there. No endpoint switch, SQL mutation or restoration was performed on render-test, and the new branch's data has not yet been queried or restore-tested.
+
+Neon's current snapshot documentation restricts manual snapshots to root branches; render-test has a parent. Therefore this is explicitly a **recovery branch**, not a manual snapshot. Its snapshot schedule was read and was empty; no recurring schedule was changed. A future independent pg_dump export should use a direct connection and approved secure storage. Such an export, restoration rehearsal and durable backup policy are still outstanding.
 
 The current connection exposes service/deployment metadata but no environment-variable read/export capability. No complete secret configuration export has been created. Preserve/export the existing effective variables securely through the owner-authorized Dashboard/provider workflow before replacing them; never put values into this document, Git or chat.
 
@@ -42,3 +59,5 @@ References verified during inspection:
 - [Render rollbacks](https://render.com/docs/rollbacks)
 - [Render PostgreSQL backups](https://render.com/docs/postgresql-backups)
 - [Render deployment behavior](https://render.com/docs/deploys)
+- [Neon branch isolation](https://neon.com/docs/introduction/branching)
+- [Neon snapshots and root-branch restriction](https://neon.com/docs/ai/ai-database-versioning)
