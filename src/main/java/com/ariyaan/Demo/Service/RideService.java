@@ -34,6 +34,10 @@ public class RideService {
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
     private final RidePaymentStore paymentStore;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ariyaan.Demo.Repository.RiderVerificationDetailsRepository verifications;
+    @org.springframework.beans.factory.annotation.Value("${app.dispatch-expiry-minutes:15}")
+    private int dispatchMinutes=15;
 
     public RideService(RideDetailsRepository rideDetailsRepository,
                        RideRequestRepository rideRequestRepository,
@@ -58,6 +62,9 @@ public class RideService {
      */
     @Transactional
     public boolean acceptRide(int rideId, int requestedRiderId, String username) {
+        // Every transition locks ride before rider to avoid accept/cancel deadlocks.
+        RideDetailsEntity ride = rideDetailsRepository.findByIdForUpdate(rideId)
+                .orElseThrow(() -> new RideNotFoundException("Ride not found"));
         User account = userRepository.findByUserName(username)
                 .orElseThrow(() -> new IllegalArgumentException("Authenticated user was not found"));
         RiderDemoEntity authenticatedRider = riderDemoRepository.findByUserId(account.getId())
@@ -71,22 +78,25 @@ public class RideService {
         RiderDemoEntity rider = riderDemoRepository.findByIdForUpdate(authenticatedRider.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Rider profile was not found"));
         int riderId = (int) rider.getId();
+        if (!verifications.findById(rider.getId()).map(v -> Boolean.TRUE.equals(v.getVerified())).orElse(false)) return false;
+        if (ride.getCreatedAt()!=null && ride.getCreatedAt().isBefore(Instant.now().minusSeconds(Math.max(1,dispatchMinutes)*60L))) return false;
         if (!"AVAILABLE".equals(rider.getStatus())
                 || rideDetailsRepository.existsByRiderIdAndRideStatusIn(riderId, List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED"))
                 || !rideRequestRepository.existsByRideIdAndRiderIdAndStatus(rideId, riderId, "SENT")) {
             return false;
         }
 
-        int updated = rideDetailsRepository.acceptRide(rideId, riderId);
-        if (updated != 1) {
+        if (!"REQUESTED".equals(ride.getRideStatus()) || ride.getRiderId() != 0) {
             return false;
         }
+        ride.setRiderId(riderId);
+        ride.setRideStatus("ACCEPTED");
+        rideDetailsRepository.save(ride);
 
         // An accepted rider must immediately be excluded from further matching.
         rider.setStatus("ON_TRIP");
         riderDemoRepository.save(rider);
 
-        RideDetailsEntity ride = rideDetailsRepository.findById(rideId).orElseThrow();
         int userId = ride.getAdminId();
 
         // Update RideRequest rows
@@ -164,17 +174,19 @@ public class RideService {
                 )
         );
 
-        // Find next nearest riders excluding those who already had requests for this ride
+        // Reuse prior offers without inserting duplicate ride/rider rows; exclude the cancelling rider.
         List<RideRequestEntity> existing = rideRequestRepository.findByRideId(rideId);
         List<Integer> excluded = new ArrayList<>();
-        for (RideRequestEntity r : existing) excluded.add(r.getRiderId());
+        for (RideRequestEntity r : existing) r.setStatus("CANCELLED");
+        rideRequestRepository.saveAll(existing);
+        excluded.add(riderId);
 
         List<Integer> candidates = riderMatchingService.findNearestRiders(ride.getPickUpLatitude(), ride.getPickUpLongitude());
         List<RideRequestEntity> newRequests = new ArrayList<>();
         Timestamp now = Timestamp.from(Instant.now());
         for (int cand : candidates) {
             if (excluded.contains(cand)) continue;
-            RideRequestEntity req = new RideRequestEntity();
+            RideRequestEntity req = existing.stream().filter(r -> r.getRiderId()==cand).findFirst().orElseGet(RideRequestEntity::new);
             req.setRideId(rideId);
             req.setRiderId(cand);
             req.setStatus("SENT");
@@ -333,6 +345,8 @@ public class RideService {
         invoiceRepository.save(invoice);
 
         // Notify both user and ride topic
+        messagingTemplate.convertAndSend("/topic/rider/"+riderId,
+                (Object)Map.of("type","RIDE_COMPLETED","rideId",rideId,"fare",ride.getFare(),"invoiceId",invoice.getInvoiceId()));
         messagingTemplate.convertAndSend(
                 "/topic/ride/" + rideId,
                 (Object) Map.of(

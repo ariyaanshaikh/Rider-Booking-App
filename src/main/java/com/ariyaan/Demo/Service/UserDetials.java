@@ -29,7 +29,6 @@ public class UserDetials {
 	    	});
 		    
 		    // 5. Send Email logic here...
-			System.out.println("Confirmation token is >>> " + user.getToken());
 			
 		}
 	

@@ -27,4 +27,7 @@ public interface UserRepository  extends CrudRepository<User, Long>{
 	Optional<User> findByMobileNumber(String mobileNumber);
 	
 	Optional<User> findByEmailIgnoreCase(String email);
+	@org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+	@org.springframework.data.jpa.repository.Query("select u from User u where lower(u.email)=lower(:email)")
+	Optional<User> findByEmailForUpdate(@org.springframework.data.repository.query.Param("email") String email);
 }

@@ -21,6 +21,14 @@ public class RideDetailsEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "RIDE_ID")
 	private int rideId;
+	@Column(name="BOOKING_KEY", length=100)
+	private String bookingKey;
+	@org.hibernate.annotations.CreationTimestamp
+	@Column(name="CREATED_AT",updatable=false)
+	private java.time.Instant createdAt;
+	public java.time.Instant getCreatedAt() { return createdAt; }
+	public String getBookingKey() { return bookingKey; }
+	public void setBookingKey(String key) { bookingKey=key; }
 	
 	@Column(name = "PICKUP_LATITUDE")
 	private double pickUpLatitude;
@@ -132,6 +140,7 @@ public class RideDetailsEntity {
 	public void setAdminId(int adminId) {
 		this.adminId = adminId;
 	}
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	public long getRideOtp() {
 		return rideOtp;
 	}
@@ -150,6 +159,7 @@ public class RideDetailsEntity {
 	public void setPaymentCompleted(String paymentCompleted) {
 		this.paymentCompleted = paymentCompleted;
 	}
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	public JsonNode getPaymentJson() {
 		return paymentJson;
 	}

@@ -14,7 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "users")
+@Table(name = "confirmation_tokens")
 public class Token {
 	
 	@Id

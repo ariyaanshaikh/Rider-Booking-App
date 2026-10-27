@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
 <title>RiderLink Ride Payment</title>
 <style>
 body{font:16px system-ui,sans-serif;background:#f4f6f9;color:#142136;margin:0;padding:32px}
@@ -11,30 +11,28 @@ button:disabled{opacity:.5}#status{white-space:pre-wrap;overflow-wrap:anywhere}s
 </style></head>
 <body><main><h1>Pay for your ride</h1>
 <p>After the rider verifies your ride OTP, pay securely through Razorpay to start the ride.</p>
-<p><small>Integration screen: supply your booking-admin token. The token stays in memory in this tab. A production app should use its existing signed-in session.</small></p>
-<label>Ride ID<input id="ride" inputmode="numeric" type="number" min="1" autocomplete="off"></label>
-<label>Booking-admin JWT<input id="jwt" type="password" autocomplete="off" spellcheck="false"></label>
+<p><small>Return to the app after payment confirmation. If this session expires, open payment again from your ride.</small></p>
 <button id="pay">Pay securely</button><button id="refresh">Check payment</button>
 <p id="status" role="status" aria-live="polite">Waiting for your ride details.</p>
-</main><script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</main>
 <script>
 const state=document.getElementById('status'), pay=document.getElementById('pay');
-let activeRide=null, activeToken=null;
+const checkoutToken=new URLSearchParams(location.hash.slice(1)).get('session');
+history.replaceState(null,'',location.pathname);
 function inputs(){
- const ride=Number(document.getElementById('ride').value);
- const token=document.getElementById('jwt').value.trim().replace(/^Bearer\s+/i,'');
- if(!Number.isSafeInteger(ride)||ride<1||!token)throw Error('Enter a valid ride ID and booking-admin JWT.');
- return {ride,token};
+ if(!checkoutToken)throw Error('Open payment from your ride in the app.');
+ return {ride:null,token:checkoutToken};
 }
 async function api(ride,token,suffix='',method='GET',body){
- const response=await fetch('/api/payments/rides/'+ride+suffix,{method,
- headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+ const response=await fetch('/api/payments/checkout/'+(suffix.replace('/','')||'status'),{method,
+ headers:{'X-Checkout-Token':token,'Content-Type':'application/json'},
  body:body?JSON.stringify(body):undefined});
  const result=await response.json();
  if(!response.ok)throw Error(result.message||'Request failed ('+response.status+').');
  return result;
 }
 function show(result){
+ if(['CAPTURED','REFUND_REQUIRED','REFUNDED'].includes(result.paymentStatus))pay.disabled=true;
  state.textContent='Fare: '+new Intl.NumberFormat('en-IN',{style:'currency',currency:result.currency}).format(result.amountPaise/100)
   +'\nPayment: '+result.paymentStatus+'\nRide: '+result.rideStatus
   +'\nRider transfer: '+result.transferStatus;
@@ -45,18 +43,20 @@ document.getElementById('refresh').onclick=async()=>{
 pay.onclick=async()=>{
  pay.disabled=true;
  try{
-  const {ride,token}=inputs();activeRide=ride;activeToken=token;
+ const {ride,token}=inputs();
   const order=await api(ride,token,'/order','POST');show(order);
+  if(['CAPTURED','REFUND_REQUIRED','REFUNDED'].includes(order.paymentStatus))return;
   if(typeof Razorpay==='undefined')throw Error('Razorpay Checkout could not load. Check your connection.');
   const checkout=new Razorpay({key:order.keyId,order_id:order.orderId,amount:order.amountPaise,
-    currency:order.currency,name:'RiderLink',description:'Ride '+ride,
+    currency:order.currency,name:'RiderLink',description:'Ride '+order.rideId,
     handler:async result=>{
      try{show(await api(ride,token,'/verify','POST',result));}
      catch(error){state.textContent=error.message+' Use Check payment to refresh; do not pay again if money was debited.';}
-     finally{pay.disabled=false;}
     },modal:{ondismiss:()=>{pay.disabled=false;state.textContent+='\nCheckout closed. You can check payment or retry the same order.';}}});
   checkout.on('payment.failed',()=>{state.textContent='Payment failed. Check payment before retrying.';pay.disabled=false;});
   checkout.open();
  }catch(error){state.textContent=error.message;pay.disabled=false;}
 };
-</script></body></html>
+if(!checkoutToken){state.textContent='Open payment from your ride in the app.';pay.disabled=true;}
+else api(null,checkoutToken).then(show).catch(()=>{});
+</script><script src="https://checkout.razorpay.com/v1/checkout.js"></script></body></html>

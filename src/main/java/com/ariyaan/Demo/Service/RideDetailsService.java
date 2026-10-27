@@ -29,6 +29,8 @@ public class RideDetailsService {
     private final com.ariyaan.Demo.Repository.UserRepository users;
 
     private final SecureRandom secureRandom = new SecureRandom();
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate db;
 
     public RideDetailsService(RideDetailsRepository rideDetailsRepository,
                               RiderMatchingService riderMatchingService,
@@ -49,15 +51,30 @@ public class RideDetailsService {
      * Returns the generated ride id.
      */
     @Transactional
-    public int saveRideDetials(RideDetailsDTO rideRequest, String username) {
+    public int saveRideDetials(RideDetailsDTO rideRequest, String username, String bookingKey) {
+        var account = users.findByUserName(username).orElseThrow();
+        if (bookingKey != null) {
+            if (!bookingKey.matches("[A-Za-z0-9_-]{8,100}")) throw new IllegalArgumentException("Invalid Idempotency-Key");
+            db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", account.getId()+":"+bookingKey);
+            var previous=rideDetailsRepository.findByAdminIdAndBookingKey(Math.toIntExact(account.getId()),bookingKey);
+            if (previous.isPresent()) {
+                var ride=previous.get();
+                if (ride.getPickUpLatitude()!=rideRequest.getPickUpLatitude() || ride.getPickUpLongitude()!=rideRequest.getPickUpLongitude()
+                        || ride.getDropLatitude()!=rideRequest.getDropLatitude() || ride.getDropLongitude()!=rideRequest.getDropLongitude()
+                        || !java.util.Objects.equals(ride.getChassisNo(),rideRequest.getChassisNo())
+                        || !java.util.Objects.equals(ride.getVehicleName(),rideRequest.getVehicleName()))
+                    throw new IllegalStateException("Idempotency-Key already belongs to a different booking");
+                return ride.getRideId();
+            }
+        }
         RideDetailsEntity rideDetailsEntity = new RideDetailsEntity();
+        rideDetailsEntity.setBookingKey(bookingKey);
         rideDetailsEntity.setPickUpLatitude(rideRequest.getPickUpLatitude());
         rideDetailsEntity.setPickUpLongitude(rideRequest.getPickUpLongitude());
         rideDetailsEntity.setDropLatitude(rideRequest.getDropLatitude());
         rideDetailsEntity.setDropLongitude(rideRequest.getDropLongitude());
         rideDetailsEntity.setChassisNo(rideRequest.getChassisNo());
         rideDetailsEntity.setVehicleName(rideRequest.getVehicleName());
-        var account = users.findByUserName(username).orElseThrow();
         rideDetailsEntity.setRideId(0);
         rideDetailsEntity.setAdminId(Math.toIntExact(account.getId()));
         rideDetailsEntity.setRiderId(0);

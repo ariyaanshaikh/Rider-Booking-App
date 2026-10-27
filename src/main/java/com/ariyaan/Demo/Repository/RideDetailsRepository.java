@@ -52,6 +52,7 @@ public interface RideDetailsRepository  extends JpaRepository<RideDetailsEntity,
 
 
 	 List<RideDetailsEntity> findByRideId(int rideId);
+	 Optional<RideDetailsEntity> findByAdminIdAndBookingKey(int adminId, String bookingKey);
 
 	 List<RideDetailsEntity> findByRiderIdOrderByRideIdDesc(int riderId);
 

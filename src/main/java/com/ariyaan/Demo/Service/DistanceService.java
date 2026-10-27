@@ -19,6 +19,7 @@ public class DistanceService {
                 || Math.abs(startLat) > 90 || Math.abs(endLat) > 90 || Math.abs(startLng) > 180 || Math.abs(endLng) > 180)
             throw new IllegalArgumentException("Invalid route coordinates");
         if (apiKey.isBlank()) throw new IllegalStateException("GOOGLE_MAPS_API_KEY is required for fare calculation");
+        if (startLat == endLat && startLng == endLng) throw new IllegalArgumentException("Pickup and destination must differ");
         GeoApiContext context = new GeoApiContext.Builder().apiKey(apiKey)
                 .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build();

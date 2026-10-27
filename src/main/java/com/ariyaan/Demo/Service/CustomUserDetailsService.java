@@ -31,15 +31,17 @@ public class CustomUserDetailsService implements UserDetailsService{
 	private final OtpService otpService;
 	
 	private final JwtUtils jwtUtils;
+	private final RequestLimits limits;
 	
 	public CustomUserDetailsService(UserRepository userRepository,PasswordEncoder passwordEncoder,TokenService tokenService,EmailService emailService,
-			OtpService otpService,JwtUtils jwtUtils) {
+			OtpService otpService,JwtUtils jwtUtils, RequestLimits limits) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenService = tokenService;
 		this.emailService = emailService;
 		this.otpService = otpService;
 		this.jwtUtils = jwtUtils;
+		this.limits = limits;
 	}
 
 
@@ -51,6 +53,7 @@ public class CustomUserDetailsService implements UserDetailsService{
 
 
 	public void registerUser(User user) {
+		limits.check("register", user.getEmail(), 5);
 	/*	// check the db if the user with same email address
 		// or username is already exists
 		
@@ -97,13 +100,14 @@ public class CustomUserDetailsService implements UserDetailsService{
 	    user.setCreatedAt(LocalDateTime.now());
 	    user.setExpiresAt(LocalDateTime.now().plusMinutes(15));
 	    user.setEnabled(false); // Make sure they are disabled until they confirm
+	    user.setId(0);
+	    user.setConfirmedAt(null);
 
 	    // 4. SAVE ONLY ONCE
 	    // This will create ONE row in the 'users' table with all columns filled.
 	    userRepository.save(user);
 	    
 	    // 5. Send Email logic here...
-		System.out.println("Confirmation token is >>> " + user.getToken());
 		
 		emailService.send(user.getEmail(), user.getToken());
 	}
@@ -144,12 +148,14 @@ public class CustomUserDetailsService implements UserDetailsService{
 	 //   return "Email confirmed successfully!";
 	}
 
+	@org.springframework.transaction.annotation.Transactional
 	public Map<String, Object> confirmEmailOtp(String email, String otp) {
 		if (email == null || email.isBlank() || otp == null || otp.isBlank()) {
 			throw new IllegalArgumentException("email and otp are required");
 		}
+		limits.check("email-otp", email, 10);
 
-		User user = userRepository.findByEmailIgnoreCase(email.trim())
+		User user = userRepository.findByEmailForUpdate(email.trim())
 				.orElseThrow(() -> new IllegalStateException("Email or OTP is invalid"));
 
 		if (!otp.trim().equals(user.getToken())) {
@@ -161,7 +167,7 @@ public class CustomUserDetailsService implements UserDetailsService{
 		}
 
 		LocalDateTime expiresAt = user.getExpiresAt();
-		if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now())) {
+		if (expiresAt == null || !expiresAt.isAfter(LocalDateTime.now())) {
 			throw new IllegalStateException("OTP expired");
 		}
 
@@ -190,19 +196,20 @@ public class CustomUserDetailsService implements UserDetailsService{
 	        return response;
 	}
 	
+	@org.springframework.transaction.annotation.Transactional
 	public boolean verifyEmailAddress(String emailAddress) {
 		if (emailAddress == null || emailAddress.isBlank()) {
 			return false;
 		}
+		limits.check("resend", emailAddress, 3);
 
-		Optional<User> existingUser = userRepository.findByEmailIgnoreCase(emailAddress.trim());
+		Optional<User> existingUser = userRepository.findByEmailForUpdate(emailAddress.trim());
 		if(existingUser.isPresent()) {
 			User user = existingUser.get();
+			if (user.isEnabled()) return true; // Resend must never disable a working account.
 			user.setToken(otpService.generateOtp());
 			user.setCreatedAt(LocalDateTime.now());
-			user.setConfirmedAt(null);
 			user.setExpiresAt(LocalDateTime.now().plusMinutes(15));
-			user.setEnabled(false);
 			userRepository.save(user);
 			// to email the token
 			emailService.send(user.getEmail(), user.getToken());

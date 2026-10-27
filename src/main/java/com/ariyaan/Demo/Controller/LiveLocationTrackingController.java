@@ -76,23 +76,27 @@ public class LiveLocationTrackingController {
 	}
 
 	@PostMapping("/{riderId}/verification-details")
+	@PreAuthorize("@riderAccess.owns(authentication, #riderId) or @riderAccess.operator(authentication)")
 	public ResponseEntity<RiderVerificationDetailsEntity> saveVerificationDetails(
 			@PathVariable long riderId, @Valid @RequestBody RiderVerificationDetailsDTO details) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(riderProfileService.saveDetails(riderId, details));
 	}
 
 	@GetMapping("/{riderId}/verification-details")
+	@PreAuthorize("@riderAccess.owns(authentication, #riderId) or @riderAccess.operator(authentication)")
 	public RiderVerificationDetailsEntity getVerificationDetails(@PathVariable long riderId) {
 		return riderProfileService.getDetails(riderId);
 	}
 
 	@PatchMapping("/{riderId}/verification")
+	@PreAuthorize("@riderAccess.operator(authentication)")
 	public RiderVerificationDetailsEntity setVerification(@PathVariable long riderId,
 			@RequestParam boolean verified) {
 		return riderProfileService.setVerified(riderId, verified);
 	}
 
 	@GetMapping("/{riderId}/history")
+	@PreAuthorize("@riderAccess.owns(authentication, #riderId) or @riderAccess.operator(authentication)")
 	public List<RideDetailsEntity> riderHistory(@PathVariable long riderId) {
 		return riderProfileService.getHistory(riderId);
 	}
@@ -134,6 +138,7 @@ public class LiveLocationTrackingController {
 	}
 
 	@GetMapping("/nearby")
+	@PreAuthorize("hasRole('ADMIN')")
 	public List<Integer> findNearbyRiders(
 			@RequestParam double lat,
 			@RequestParam double lon) {

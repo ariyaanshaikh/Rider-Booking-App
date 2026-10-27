@@ -108,6 +108,8 @@ public class RidePaymentService {
     private void notifyStarted(int rideId) {
         var ride = rides.findById(rideId).orElseThrow();
         var payload = Map.of("type", "RIDE_STARTED", "rideId", rideId, "paymentStatus", "CAPTURED");
+        messages.convertAndSend("/topic/user/"+ride.getAdminId(),payload);
+        messages.convertAndSend("/topic/rider/"+ride.getRiderId(),payload);
         users.findById((long)ride.getAdminId()).ifPresent(user -> messages.convertAndSendToUser(
                 user.getUserName(), "/queue/ride/" + rideId + "/events", payload));
         riders.findById((long)ride.getRiderId()).flatMap(rider -> users.findById(rider.getUserId()))

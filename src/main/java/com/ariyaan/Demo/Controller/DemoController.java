@@ -33,6 +33,8 @@ public class DemoController {
 	
 	@Autowired
 	private AuthenticationManager authenticationManager;
+	@Autowired
+	private com.ariyaan.Demo.Service.RequestLimits requestLimits;
 	
 	@GetMapping("/demo")
 //	@ResponseBody
@@ -45,6 +47,7 @@ public class DemoController {
 	@PostMapping("/login")
 	@ResponseBody
 	public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+		requestLimits.check("login", loginRequest.getUsername(), 20);
 	    // 1. This line checks the username and password against the DB automatically
 	    Authentication authentication = authenticationManager.authenticate(
 	        new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())

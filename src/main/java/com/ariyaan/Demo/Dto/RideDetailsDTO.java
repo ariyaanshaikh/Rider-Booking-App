@@ -11,15 +11,23 @@ public class RideDetailsDTO {
 	private int rideId;
 
 	@NotNull(message = "Pickup latitude is required")
+		@jakarta.validation.constraints.DecimalMin("-90")
+		@jakarta.validation.constraints.DecimalMax("90")
 	private Double pickUpLatitude;
 
 	@NotNull(message = "Pickup longitude is required")
+		@jakarta.validation.constraints.DecimalMin("-180")
+		@jakarta.validation.constraints.DecimalMax("180")
 	private Double pickUpLongitude;
 
 	@NotNull(message = "Drop latitude is required")
+		@jakarta.validation.constraints.DecimalMin("-90")
+		@jakarta.validation.constraints.DecimalMax("90")
 	private Double dropLatitude;
 
 	@NotNull(message = "Drop longitude is required")
+		@jakarta.validation.constraints.DecimalMin("-180")
+		@jakarta.validation.constraints.DecimalMax("180")
 	private Double dropLongitude;
 
 	/** Legacy input is ignored; the server calculates the fare from Google distance. */

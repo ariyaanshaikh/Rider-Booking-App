@@ -1,0 +1,7 @@
+.git
+target
+.env
+env.sh
+src/main/resources/application.properties
+docs
+**/__pycache__

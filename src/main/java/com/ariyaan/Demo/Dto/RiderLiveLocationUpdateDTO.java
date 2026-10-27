@@ -6,9 +6,13 @@ import jakarta.validation.constraints.NotNull;
 public class RiderLiveLocationUpdateDTO {
 
     @NotNull(message = "Latitude is required")
+    @jakarta.validation.constraints.DecimalMin("-90")
+    @jakarta.validation.constraints.DecimalMax("90")
     private Double latitude;
 
     @NotNull(message = "Longitude is required")
+    @jakarta.validation.constraints.DecimalMin("-180")
+    @jakarta.validation.constraints.DecimalMax("180")
     private Double longitude;
 
     public double getLatitude() { return latitude; }

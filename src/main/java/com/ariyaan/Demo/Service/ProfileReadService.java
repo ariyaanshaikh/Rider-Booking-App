@@ -26,7 +26,7 @@ import com.ariyaan.Demo.Repository.UserRepository;
 @Service
 public class ProfileReadService {
 
-    private static final Collection<String> ACTIVE_RIDE_STATUSES = List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED");
+    private static final Collection<String> ACTIVE_RIDE_STATUSES = List.of("REQUESTED", "ACCEPTED", "AWAITING_PAYMENT", "STARTED");
 
     private final UserRepository userRepository;
     private final RiderDemoRepository riderRepository;
@@ -34,6 +34,8 @@ public class ProfileReadService {
     private final RiderLocationRepository locationRepository;
     private final RideDetailsRepository rideRepository;
     private final InvoiceRepository invoiceRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ariyaan.Demo.config.RiderAccess riderAccess;
 
     public ProfileReadService(UserRepository userRepository, RiderDemoRepository riderRepository,
             RiderVerificationDetailsRepository verificationRepository, RiderLocationRepository locationRepository,
@@ -57,6 +59,7 @@ public class ProfileReadService {
         response.put("mobileNumber", user.getMobileNumber());
         response.put("role", user.getRole());
         response.put("enabled", user.isEnabled());
+        response.put("operationsAccess", riderAccess.operator(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication()));
 
         if (user.getRole() == UserRole.RIDER) {
             response.put("rider", findRider(user).map(this::riderSummary).orElse(null));
@@ -165,6 +168,8 @@ public class ProfileReadService {
         response.put("dropLongitude", ride.getDropLongitude());
         response.put("fare", ride.getFare());
         response.put("distanceMeters", ride.getDistanceMeters());
+        response.put("riderPaise", ride.getDistanceMeters()!=null && ride.getDistanceMeters()>0
+                ? FarePolicy.quote(ride.getDistanceMeters()).riderPaise() : null);
         response.put("paymentStatus", ride.getPaymentCompleted());
 		response.put("chassisNo", ride.getChassisNo());
 		response.put("vehicleName", ride.getVehicleName());

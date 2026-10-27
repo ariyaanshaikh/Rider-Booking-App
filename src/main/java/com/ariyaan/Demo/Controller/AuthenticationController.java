@@ -62,9 +62,9 @@ public class AuthenticationController {
 	
 	// this logic is for mazz's code
 	@PostMapping
-	public ResponseEntity<?> postUser(@RequestBody User user) {
+	public ResponseEntity<?> postUser(@jakarta.validation.Valid @RequestBody com.ariyaan.Demo.Dto.RegistrationRequest input) {
 
-	    userDetailsService.registerUser(user);
+	    userDetailsService.registerUser(input.toUser());
 
 	    return ResponseEntity.ok().body(
 	        Map.of(
@@ -97,16 +97,9 @@ public class AuthenticationController {
 	public ResponseEntity<?> verifyEmail(@RequestParam("emailAddress") String emailAddress) {
 		boolean emailRequested = customUserDetailsService.verifyEmailAddress(emailAddress);
 
-		if (!emailRequested) {
-			return ResponseEntity.status(404).body(Map.of(
-					"success", false,
-					"message", "No user was found for this email address"
-			));
-		}
-
 		return ResponseEntity.ok(Map.of(
 				"success", true,
-				"message", "A confirmation email has been requested"
+				"message", "If this address is registered, a confirmation email has been requested"
 		));
 	}
 	
@@ -116,10 +109,15 @@ public class AuthenticationController {
 	@ResponseBody
 	public String updateUserPassword(@ModelAttribute("user")User user,Model model, RedirectAttributes redirectAttributes) {
 	// save user to DB
-		userDetails.registerUser(user);
-		redirectAttributes.addFlashAttribute("message","Please confirm your email address");
-		return "user updatedb successfully";
+		throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.GONE,
+				"Password changes require a verified reset session");
 		
+	}
+
+	@PostMapping("/verifyEmail")
+	@ResponseBody
+	public ResponseEntity<?> resend(@RequestBody Map<String,String> input) {
+		return verifyEmail(input.get("emailAddress"));
 	}
 	
 	

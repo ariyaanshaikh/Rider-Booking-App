@@ -29,10 +29,12 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
     private final JwtUtils jwtUtils;
     private final CustomUserDetailsService userDetailsService;
+    private final SocketAccess socketAccess;
 
-    public JwtChannelInterceptor(JwtUtils jwtUtils, CustomUserDetailsService userDetailsService) {
+    public JwtChannelInterceptor(JwtUtils jwtUtils, CustomUserDetailsService userDetailsService, SocketAccess socketAccess) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.socketAccess = socketAccess;
     }
 
     @Override
@@ -73,6 +75,8 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 accessor.setUser(auth);
+                if (accessor.getSessionAttributes() != null)
+                    accessor.getSessionAttributes().put("jwtExpiresAt", jwtUtils.extractClaim(token, io.jsonwebtoken.Claims::getExpiration).getTime());
             } catch (AccessDeniedException ex) {
                 throw ex;
             } catch (Exception ex) {
@@ -81,6 +85,15 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
             }
         }
 
+        if (StompCommand.SEND.equals(accessor.getCommand()))
+            throw new AccessDeniedException("Client publishing is not supported; use authenticated HTTP APIs");
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            Object expiry = accessor.getSessionAttributes() == null ? null : accessor.getSessionAttributes().get("jwtExpiresAt");
+            if (!(expiry instanceof Long) || ((Long)expiry) <= System.currentTimeMillis()
+                    || !(accessor.getUser() instanceof org.springframework.security.core.Authentication auth)
+                    || !socketAccess.allowed(auth, accessor.getDestination()))
+                throw new AccessDeniedException("This subscription is not authorized");
+        }
         return message;
     }
 

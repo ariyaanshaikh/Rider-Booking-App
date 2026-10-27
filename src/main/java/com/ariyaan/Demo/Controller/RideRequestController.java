@@ -36,6 +36,8 @@ import com.ariyaan.Demo.Service.RiderMatchingService;
 @RestController
 @RequestMapping("/ride")
 public class RideRequestController {
+	@org.springframework.beans.factory.annotation.Autowired
+	private com.ariyaan.Demo.Service.RequestLimits limits;
 	
 	private final RideDetailsService rideDetailsService;
 	private final RiderMatchingService riderMatchingService;
@@ -66,8 +68,9 @@ public class RideRequestController {
 	@PostMapping("/request")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<String> requestRide(@Valid @RequestBody RideDetailsDTO rideRequest,
+			@org.springframework.web.bind.annotation.RequestHeader(value="Idempotency-Key",required=false) String bookingKey,
 			org.springframework.security.core.Authentication authentication) {
-		int rideId = rideDetailsService.saveRideDetials(rideRequest, authentication.getName());
+		int rideId = rideDetailsService.saveRideDetials(rideRequest, authentication.getName(), bookingKey);
 		return ResponseEntity.ok("Ride Request Sent, id=" + rideId);
 	}
 	
@@ -128,6 +131,7 @@ public class RideRequestController {
 			@RequestParam int riderId,
 			@RequestParam int otp, org.springframework.security.core.Authentication authentication) {
 
+		limits.check("ride-otp", authentication.getName()+":"+rideId, 10);
 		boolean started = rideService.startRide(rideId, riderId, otp, authentication.getName());
 		if (started) {
 			return ResponseEntity.ok("OTP verified. Payment required before ride starts");

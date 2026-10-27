@@ -21,6 +21,14 @@ import java.util.Map;
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
+	@ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+	public ResponseEntity<Map<String,Object>> handleAuthentication(Exception ex) {
+		return clientError(HttpStatus.UNAUTHORIZED,"UNAUTHORIZED","Invalid credentials or account unavailable");
+	}
+	@ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+	public ResponseEntity<Map<String,Object>> handleConstraint(Exception ex) {
+		return clientError(HttpStatus.CONFLICT,"CONFLICT","A record with these details already exists or is invalid");
+	}
 	@ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
 		org.springframework.web.bind.ServletRequestBindingException.class})
 	public ResponseEntity<Map<String,Object>> handleMalformedRequest(Exception ex) {
