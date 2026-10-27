@@ -15,6 +15,8 @@ import java.util.function.Function;
 public class JwtUtils {
 
     private final Key key;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.ariyaan.Demo.Repository.UserRepository users;
     public JwtUtils(@org.springframework.beans.factory.annotation.Value("${app.jwt.secret}") String secret) {
         if (secret == null || secret.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 32)
             throw new IllegalStateException("JWT_SECRET must contain at least 32 bytes");
@@ -44,6 +46,7 @@ public class JwtUtils {
                 .compact(); */
     	return Jwts.builder()
                 .setSubject(username)
+                .claim("cv", users==null ? 0 : users.findByUserName(username).map(com.ariyaan.Demo.Entity.User::getCredentialVersion).orElse(0))
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + thirtyDaysInMillis))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -52,7 +55,10 @@ public class JwtUtils {
 
     public boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        Number version=extractClaim(token,claims -> claims.get("cv",Number.class));
+        int current=userDetails instanceof com.ariyaan.Demo.Entity.User user ? user.getCredentialVersion() : 0;
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token)
+                && (version==null ? 0 : version.intValue())==current;
     }
 
     private boolean isTokenExpired(String token) {

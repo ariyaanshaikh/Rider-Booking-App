@@ -9,6 +9,15 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
 	private final JavaMailSender mailSender;
+    @org.springframework.beans.factory.annotation.Value("${app.mail.from:${spring.mail.username:noreply@localhost}}")
+    private String sender;
+    /** Synchronous so the durable worker can retry an SMTP failure. */
+    public void sendReset(String recipient,String otp) {
+        var message=new SimpleMailMessage();message.setTo(recipient);message.setFrom(sender);
+        message.setSubject("Reset your RiderLink password");
+        message.setText("Your password reset code is: "+otp+"\nIt expires in 15 minutes. If you did not request it, ignore this message.");
+        mailSender.send(message);
+    }
 
 	public EmailService(JavaMailSender mailSender) {
 		this.mailSender = mailSender;

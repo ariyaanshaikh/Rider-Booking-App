@@ -12,17 +12,31 @@ import org.springframework.transaction.support.*;
 @Component
 public class CommittedMessages extends SimpMessagingTemplate {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(CommittedMessages.class);
+    private SimpMessagingTemplate local;
+    private com.ariyaan.Demo.Service.MessagePreparation preparation;
+    private boolean shared;
     public CommittedMessages(@Qualifier("brokerChannel") MessageChannel channel) { super(channel); }
+    @org.springframework.beans.factory.annotation.Autowired
+    public CommittedMessages(@Qualifier("brokerChannel") MessageChannel channel,
+            @Qualifier("brokerMessagingTemplate") SimpMessagingTemplate local,
+            com.ariyaan.Demo.Service.MessagePreparation preparation,
+            @org.springframework.beans.factory.annotation.Value("${app.messaging.shared:false}") boolean shared) {
+        this(channel);this.local=local;this.preparation=preparation;this.shared=shared;
+        setMessageConverter(local.getMessageConverter());
+    }
     @Override
     protected void doSend(String destination, Message<?> message) {
+        Object payload=preparation==null?message.getPayload():preparation.prepare(destination,message.getPayload(),shared);
+        if(shared)return; // Every node, including this one, dispatches from the committed database log.
+        Runnable send=()->{ if(local==null) CommittedMessages.super.doSend(destination,message); else local.convertAndSend(destination,payload); };
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() {
-                    try { CommittedMessages.super.doSend(destination,message); }
+                    try { send.run(); }
                     catch (RuntimeException ex) { log.error("Committed ride event could not be delivered to {}",destination); }
                 }
             });
-        } else super.doSend(destination,message);
+        } else send.run();
     }
 }

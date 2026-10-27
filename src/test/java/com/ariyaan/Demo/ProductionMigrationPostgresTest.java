@@ -31,6 +31,18 @@ class ProductionMigrationPostgresTest {
         assertNotNull(db.queryForObject("SELECT count(*) FROM request_limits",Integer.class));
         assertNotNull(db.queryForObject("SELECT count(*) FROM checkout_sessions",Integer.class));
     }
+    @Test void recoveryUpgradePreservesExistingAccountAndRideState() {
+        Flyway.configure().dataSource(source).locations("classpath:db/production").table("production_schema_history")
+                .target("1").load().migrate();
+        db.update("INSERT INTO users(id,user_name,email,role,enabled,password) VALUES(3,'existing','existing@example.com','ADMIN',true,'existing-password-hash')");
+        db.update("INSERT INTO ride_details(ride_id,pickup_latitude,pickup_longitude,drop_latitude,drop_longitude,fare,chassis_no,vehicle_name,admin_id,ride_otp) VALUES(42,19,72,20,73,361,'chassis','bike',3,1234)");
+        migrate();migrate();
+        assertEquals("existing-password-hash",db.queryForObject("SELECT password FROM users WHERE id=3",String.class));
+        assertEquals(0,db.queryForObject("SELECT credential_version FROM users WHERE id=3",Integer.class));
+        assertEquals(1234,db.queryForObject("SELECT ride_otp FROM ride_details WHERE ride_id=42",Integer.class));
+        assertNotNull(db.queryForObject("SELECT count(*) FROM push_jobs",Integer.class));
+        assertNotNull(db.queryForObject("SELECT count(*) FROM socket_events",Integer.class));
+    }
     @Test void manuallyInitializedDatabasePreservesExistingAccountsAndOldHistory() throws Exception {
         String sql=Files.readString(Path.of("docs/DATABASE_SETUP_AND_REFERENCE.sql"));
         db.execute(sql.substring(sql.indexOf("CREATE TABLE"),sql.indexOf("-- Matching reference query")));

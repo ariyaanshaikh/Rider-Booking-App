@@ -76,7 +76,7 @@ public class RidePaymentService {
             throw new IllegalArgumentException("Payment order mismatch");
         if (!"captured".equals(captured.path("status").asText()))
             throw new IllegalStateException("Payment is not captured yet; wait for confirmation");
-        if (store.captured(captured)) notifyStarted(rideId);
+        store.captured(captured);
         return status(rideId, username);
     }
     public void webhook(String body, String signature, String eventId) {
@@ -90,30 +90,16 @@ public class RidePaymentService {
             throw new IllegalArgumentException("Invalid webhook event");
         String type = event.path("event").asText();
         if (type.length() > 80) throw new IllegalArgumentException("Invalid webhook event");
-        final int[] started = {0};
         store.recordWebhook(eventId, type, () -> {
             if ("payment.captured".equals(type) || "order.paid".equals(type)) {
                 JsonNode entity = event.path("payload").path("payment").path("entity");
-                if (store.captured(entity)) {
-                    started[0] = store.rideIdForOrder(entity.path("order_id").asText());
-                }
+                store.captured(entity);
             } else if ("refund.processed".equals(type)) {
                 store.refunded(event.path("payload").path("refund").path("entity"));
             } else if ("transfer.processed".equals(type) || "transfer.failed".equals(type)) {
                 store.transferEvent(event.path("payload").path("transfer").path("entity"));
             }
         });
-        if (started[0] != 0) notifyStarted(started[0]);
-    }
-    private void notifyStarted(int rideId) {
-        var ride = rides.findById(rideId).orElseThrow();
-        var payload = Map.of("type", "RIDE_STARTED", "rideId", rideId, "paymentStatus", "CAPTURED");
-        messages.convertAndSend("/topic/user/"+ride.getAdminId(),payload);
-        messages.convertAndSend("/topic/rider/"+ride.getRiderId(),payload);
-        users.findById((long)ride.getAdminId()).ifPresent(user -> messages.convertAndSendToUser(
-                user.getUserName(), "/queue/ride/" + rideId + "/events", payload));
-        riders.findById((long)ride.getRiderId()).flatMap(rider -> users.findById(rider.getUserId()))
-                .ifPresent(user -> messages.convertAndSendToUser(user.getUserName(), "/queue/ride/" + rideId + "/events", payload));
     }
     /** Disabled until Route approval, credentials and trusted linked-account mappings are configured. */
     @Scheduled(fixedDelayString="${razorpay.transfer-poll-ms:60000}")

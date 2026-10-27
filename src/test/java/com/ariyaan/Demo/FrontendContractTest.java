@@ -24,6 +24,7 @@ class FrontendContractTest {
     @MockitoBean RequestLimits limits;
     @MockitoBean EmailService email;
     @MockitoBean DispatchExpiry expiry;
+    @MockitoBean PasswordResetService resets;
     @BeforeEach void cleanup() { users.deleteAll(); }
     User account(String name,UserRole role,boolean enabled) {
         var u=new User();u.setUserName(name);u.setEmail(name+"@example.com");u.setRole(role);u.setEnabled(enabled);
@@ -69,5 +70,24 @@ class FrontendContractTest {
         mvc.perform(get("/api/payments/checkout/status")).andExpect(status().isBadRequest());
         mvc.perform(get("/api/payments/checkout/status").header("X-Checkout-Token","invalid")).andExpect(status().isUnauthorized());
         mvc.perform(get("/sendJWT").param("username","payer")).andExpect(status().is4xxClientError());
+    }
+    @Test void recoveryEndpointsUseVerifiedResetSessionAndDoNotRequireAnExistingLogin() throws Exception {
+        org.mockito.Mockito.when(resets.verify("payer@example.com","123456")).thenReturn(java.util.Map.of("resetToken","a".repeat(43),"expiresInSeconds",600));
+        mvc.perform(post("/auth/sendotp").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"payer@example.com\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true));
+        mvc.perform(post("/auth/verifyotp").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"payer@example.com\",\"otp\":\"123456\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.resetToken").value("a".repeat(43)));
+        mvc.perform(post("/auth/resetpassword").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"payer@example.com\",\"resetToken\":\""+"a".repeat(43)+"\",\"password\":\"new-password-123\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/auth/resetpassword").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"payer@example.com\",\"password\":\"new-password-123\"}"))
+                .andExpect(status().isBadRequest());
+    }
+    @Test void notificationApiRejectsAnonymousAccessAndCrossRoleDeviceRegistration() throws Exception {
+        mvc.perform(get("/api/notifications")).andExpect(status().is4xxClientError());
+        account("payer",UserRole.ADMIN,true);String bearer="Bearer "+jwt.generateToken("payer");
+        mvc.perform(put("/api/notifications/devices").header("Authorization",bearer).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"app\":\"rider\",\"installationId\":\"installation_12345678\",\"token\":\"ExponentPushToken[abcdefgh123456]\",\"platform\":\"android\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/notifications/delivery-status").header("Authorization",bearer)).andExpect(status().isForbidden());
     }
 }

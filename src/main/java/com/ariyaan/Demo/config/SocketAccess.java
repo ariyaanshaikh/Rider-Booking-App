@@ -17,6 +17,8 @@ public class SocketAccess {
         if (auth == null || destination == null) return false;
         var user = users.findByUserName(auth.getName()).filter(u -> u.isEnabled()).orElse(null);
         if (user == null) return false;
+        if(auth.getPrincipal() instanceof com.ariyaan.Demo.Entity.User connected
+                && connected.getCredentialVersion()!=user.getCredentialVersion()) return false;
         if (destination.equals("/topic/user/" + user.getId())) return user.getRole() == UserRole.ADMIN;
         var rider = riders.findByUserId(user.getId()).orElse(null);
         if (destination.matches("/topic/rider/[1-9][0-9]*"))

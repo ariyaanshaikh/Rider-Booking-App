@@ -14,6 +14,12 @@ import com.ariyaan.Demo.config.JwtChannelInterceptor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private final JwtChannelInterceptor jwtChannelInterceptor;
+    @org.springframework.beans.factory.annotation.Autowired
+    private SocketSessions sessions;
+    @Override
+    public void configureWebSocketTransport(org.springframework.web.socket.config.annotation.WebSocketTransportRegistration registration) {
+        registration.addDecoratorFactory(sessions::decorate);
+    }
 
 	public WebSocketConfig(JwtChannelInterceptor jwtChannelInterceptor) {
 		this.jwtChannelInterceptor = jwtChannelInterceptor;

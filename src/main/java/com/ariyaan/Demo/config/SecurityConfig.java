@@ -60,6 +60,7 @@ public class SecurityConfig {
                 // by JwtChannelInterceptor.
                 .requestMatchers("/sendJWT", "/otp/**", "/demo", "/register/updateUser").denyAll()
                 .requestMatchers("/api/payments/checkout/**").permitAll()
+                .requestMatchers("/auth/sendotp","/auth/verifyotp","/auth/resetpassword").permitAll()
                 .requestMatchers("/register/**", "/login", "/health", "/health/live", "/error", "/ws/**", "/payment-checkout.html", "/api/payments/razorpay/webhook").permitAll()
                 .anyRequest().authenticated()
             )

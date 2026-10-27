@@ -15,6 +15,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 /** Durable intent is committed before provider calls, so timeouts never cause blind retries. */
 @Service
 public class RidePaymentStore {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private org.springframework.messaging.simp.SimpMessagingTemplate messages;
     private final JdbcTemplate db;
     public RidePaymentStore(JdbcTemplate db) { this.db = db; }
     public record Payment(int rideId, long amountPaise, long businessPaise, long riderPaise,
@@ -97,6 +99,15 @@ public class RidePaymentStore {
         db.update("UPDATE ride_details SET payment_completed=? WHERE ride_id=?",
                 start ? "CAPTURED" : "REFUND_REQUIRED", payment.rideId());
         if (start) db.update("UPDATE ride_details SET ride_status='STARTED' WHERE ride_id=?", payment.rideId());
+        if(start && messages!=null) {
+            var payload=Map.of("type","RIDE_STARTED","rideId",payment.rideId(),"paymentStatus","CAPTURED");
+            messages.convertAndSend("/topic/user/"+ride.get("admin_id"),(Object)payload);
+            messages.convertAndSend("/topic/rider/"+ride.get("rider_id"),(Object)payload);
+            for(String username:db.queryForList("""
+                SELECT user_name FROM users WHERE id=? OR id IN(SELECT user_id FROM rider_details WHERE id=?)
+                """,String.class,ride.get("admin_id"),ride.get("rider_id")))
+                messages.convertAndSendToUser(username,"/queue/ride/"+payment.rideId()+"/events",payload);
+        }
         return start;
     }
     @Transactional

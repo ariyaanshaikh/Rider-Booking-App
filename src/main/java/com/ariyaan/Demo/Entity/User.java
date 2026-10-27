@@ -23,6 +23,11 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "users")
 public class User implements UserDetails {
+    @Column(name="credential_version",nullable=false)
+    private int credentialVersion;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public int getCredentialVersion() { return credentialVersion; }
+    public void setCredentialVersion(int value) { credentialVersion=value; }
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
