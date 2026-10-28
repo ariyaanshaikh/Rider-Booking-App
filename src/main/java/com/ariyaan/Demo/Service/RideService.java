@@ -194,7 +194,7 @@ public class RideService {
             newRequests.add(req);
         }
         if (!newRequests.isEmpty()) {
-            rideRequestRepository.saveAll(newRequests);
+            rideRequestRepository.saveAllAndFlush(newRequests);
         }
 
         // Notify the new riders
@@ -251,6 +251,10 @@ public class RideService {
         // Update ride request statuses
         List<RideRequestEntity> requests = rideRequestRepository.findByRideId(rideId);
         for (RideRequestEntity req : requests) {
+            if ("SENT".equals(req.getStatus()) && req.getRiderId()!=riderId) {
+                messagingTemplate.convertAndSend("/topic/rider/"+req.getRiderId(),
+                        (Object)Map.of("type","RIDE_CANCELLED_BY_USER","rideId",rideId));
+            }
             req.setStatus("CANCELLED");
         }
         rideRequestRepository.saveAll(requests);
@@ -299,6 +303,8 @@ public class RideService {
                         "rideId", rideId
                 )
         );
+        messagingTemplate.convertAndSend("/topic/rider/"+riderId,
+                (Object)Map.of("type","PAYMENT_REQUIRED","rideId",rideId));
 
         return true;
     }

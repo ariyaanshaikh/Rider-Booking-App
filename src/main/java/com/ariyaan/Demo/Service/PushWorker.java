@@ -13,6 +13,8 @@ public class PushWorker {
     private final JdbcTemplate db;
     private final ExpoPushClient expo;
     private final boolean enabled;
+    @Value("${app.dispatch-expiry-minutes:15}")
+    private int dispatchMinutes=15;
     public PushWorker(JdbcTemplate db,ExpoPushClient expo,@Value("${app.push.enabled:false}") boolean enabled) {
         this.db=db;this.expo=expo;this.enabled=enabled;
     }
@@ -40,8 +42,10 @@ public class PushWorker {
             if("RIDE_REQUEST".equals(notification.get("type")) && !Boolean.TRUE.equals(db.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM ride_details r JOIN ride_request q ON q.ride_id=r.ride_id
                 JOIN rider_details d ON d.id=q.rider_id WHERE r.ride_id=? AND r.ride_status='REQUESTED'
-                AND q.status='SENT' AND d.user_id=?)
-                """,Boolean.class,notification.get("ride_id"),notification.get("user_id")))) { finish(job,"CANCELLED",null);continue; }
+                AND q.status='SENT' AND d.user_id=? AND d.status='AVAILABLE'
+                AND r.created_at>now()-make_interval(mins=>?)
+                AND ?='RIDE_REQUEST:'||q.id||':'||(extract(epoch FROM q.created_at)*1000000)::bigint::text)
+                """,Boolean.class,notification.get("ride_id"),notification.get("user_id"),Math.max(1,dispatchMinutes),notification.get("event_key")))) { finish(job,"CANCELLED",null);continue; }
             try {
                 var result=expo.send(job.get("token").toString(),Map.of("eventId",notification.get("id").toString(),
                         "type",notification.get("type"),"rideId",notification.get("ride_id"),"remote",true),((Number)job.get("ttl")).intValue());

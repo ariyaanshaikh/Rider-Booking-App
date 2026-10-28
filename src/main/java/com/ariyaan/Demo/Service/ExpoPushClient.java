@@ -36,11 +36,11 @@ public class ExpoPushClient {
     public Result send(String token,Map<String,Object> data,int ttl) {
         String type=String.valueOf(data.get("type"));
         String title=switch(type) {
-            case "RIDE_REQUEST" -> "New ride request";
+            case "RIDE_REQUEST" -> "New Ride Request";
             case "RIDE_ACCEPTED" -> "Rider accepted";
             case "PAYMENT_REQUIRED" -> "Payment required";
             case "RIDE_STARTED" -> "Ride started";
-            case "RIDE_COMPLETED" -> "Ride completed";
+            case "RIDE_COMPLETED" -> "Ride Completed";
             default -> "Ride updated";
         };
         var response=post("/send",Map.of("to",token,"title",title,"body","Open the app for the latest ride details.",

@@ -27,6 +27,16 @@ public class EventNotifications {
         if (owners.isEmpty()) return null;
         String type=data.get("type").toString();
         String key=(Set.of("RIDE_STARTED","RIDE_COMPLETED","RIDE_CANCELLED_BY_USER").contains(type) ? type+":"+ride : UUID.randomUUID().toString());
+        if ("RIDE_REQUEST".equals(type)) {
+            // One alert per persisted offer attempt, but a later rematch can alert again.
+            var offers=db.queryForList("""
+                SELECT 'RIDE_REQUEST:'||q.id||':'||(extract(epoch FROM q.created_at)*1000000)::bigint::text
+                FROM ride_request q JOIN rider_details d ON d.id=q.rider_id
+                WHERE q.ride_id=? AND d.user_id=? AND q.status='SENT'
+                """,String.class,ride.intValue(),owners.get(0));
+            if(offers.isEmpty()) return null;
+            key=offers.get(0);
+        }
         UUID id=UUID.randomUUID();
         db.update("INSERT INTO notification_inbox(id,user_id,event_key,type,ride_id) VALUES(?,?,?,?,?) ON CONFLICT(user_id,event_key) DO NOTHING",
                 id,owners.get(0),key,type,ride.intValue());

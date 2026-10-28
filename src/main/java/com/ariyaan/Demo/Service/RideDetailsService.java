@@ -109,7 +109,7 @@ public class RideDetailsService {
         }
 
         if (!requests.isEmpty()) {
-            rideRequestRepository.saveAll(requests);
+            rideRequestRepository.saveAllAndFlush(requests);
         }
 
         // Notify riders via WebSocket with a concise payload
