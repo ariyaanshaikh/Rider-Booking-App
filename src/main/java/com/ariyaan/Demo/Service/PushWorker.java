@@ -44,8 +44,9 @@ public class PushWorker {
                 JOIN rider_details d ON d.id=q.rider_id WHERE r.ride_id=? AND r.ride_status='REQUESTED'
                 AND q.status='SENT' AND d.user_id=? AND d.status='AVAILABLE'
                 AND r.created_at>now()-make_interval(mins=>?)
+                AND q.created_at>now()-make_interval(mins=>?)
                 AND ?='RIDE_REQUEST:'||q.id||':'||(extract(epoch FROM q.created_at)*1000000)::bigint::text)
-                """,Boolean.class,notification.get("ride_id"),notification.get("user_id"),Math.max(1,dispatchMinutes),notification.get("event_key")))) { finish(job,"CANCELLED",null);continue; }
+                """,Boolean.class,notification.get("ride_id"),notification.get("user_id"),Math.max(1,dispatchMinutes),Math.max(1,dispatchMinutes),notification.get("event_key")))) { finish(job,"CANCELLED",null);continue; }
             try {
                 var result=expo.send(job.get("token").toString(),Map.of("eventId",notification.get("id").toString(),
                         "type",notification.get("type"),"rideId",notification.get("ride_id"),"remote",true),((Number)job.get("ttl")).intValue());

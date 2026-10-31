@@ -20,6 +20,8 @@ public class NotificationController {
     private com.ariyaan.Demo.Service.RequestLimits limits;
     @org.springframework.beans.factory.annotation.Value("${app.dispatch-expiry-minutes:15}")
     private int dispatchMinutes=15;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ariyaan.Demo.Service.RideService rides;
     public NotificationController(JdbcTemplate db,UserRepository users,EventNotifications events) { this.db=db;this.users=users;this.events=events; }
     public record Device(@Pattern(regexp="admin|rider") @NotNull String app,
             @Pattern(regexp="[A-Za-z0-9_-]{16,64}") @NotNull String installationId,
@@ -53,14 +55,31 @@ public class NotificationController {
     @GetMapping("/ride-requests")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('RIDER')")
     public List<Map<String,Object>> pendingRequests(Authentication auth) {
+        return pendingRequests(auth.getName(),0);
+    }
+    @GetMapping("/ride-requests/{rideId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('RIDER')")
+    public Map<String,Object> pendingRequest(Authentication auth,@PathVariable int rideId) {
+        if(rideId<1) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"Offer not available");
+        return pendingRequests(auth.getName(),rideId).stream().findFirst().orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"Offer not available"));
+    }
+    @PostMapping("/ride-requests/{rideId}/decline")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('RIDER')")
+    public Map<String,Object> decline(Authentication auth,@PathVariable int rideId) {
+        rides.declineOffer(rideId,auth.getName());
+        return Map.of("declined",true,"rideId",rideId);
+    }
+    private List<Map<String,Object>> pendingRequests(String username,int rideId) {
         return db.queryForList("""
             SELECT r.ride_id AS "rideId",r.pickup_latitude AS "pickupLatitude",r.pickup_longitude AS "pickupLongitude",
                 r.drop_latitude AS "dropLatitude",r.drop_longitude AS "dropLongitude",r.fare,r.vehicle_name AS "vehicleName",r.chassis_no AS "chassisNo"
             FROM ride_request q JOIN ride_details r ON r.ride_id=q.ride_id JOIN rider_details d ON d.id=q.rider_id
             JOIN users u ON u.id=d.user_id WHERE u.user_name=? AND q.status='SENT' AND r.ride_status='REQUESTED'
             AND r.created_at>now()-make_interval(mins=>?) AND d.status='AVAILABLE'
+            AND q.created_at>now()-make_interval(mins=>?) AND (?=0 OR r.ride_id=?)
             ORDER BY q.created_at DESC LIMIT 10
-            """,auth.getName(),Math.max(1,dispatchMinutes));
+            """,username,Math.max(1,dispatchMinutes),Math.max(1,dispatchMinutes),rideId,rideId);
     }
     @GetMapping("/delivery-status")
     @org.springframework.security.access.prepost.PreAuthorize("@riderAccess.operator(authentication)")

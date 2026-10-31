@@ -82,7 +82,8 @@ public class RideService {
         if (ride.getCreatedAt()!=null && ride.getCreatedAt().isBefore(Instant.now().minusSeconds(Math.max(1,dispatchMinutes)*60L))) return false;
         if (!"AVAILABLE".equals(rider.getStatus())
                 || rideDetailsRepository.existsByRiderIdAndRideStatusIn(riderId, List.of("ACCEPTED", "AWAITING_PAYMENT", "STARTED"))
-                || !rideRequestRepository.existsByRideIdAndRiderIdAndStatus(rideId, riderId, "SENT")) {
+                || !rideRequestRepository.existsByRideIdAndRiderIdAndStatusAndCreatedAtAfter(rideId, riderId, "SENT",
+                    Timestamp.from(Instant.now().minusSeconds(Math.max(1,dispatchMinutes)*60L)))) {
             return false;
         }
 
@@ -382,6 +383,26 @@ public class RideService {
 	 */
     
     
+    /** Declining an offer is not cancellation of an assigned ride. Lock in the same order as acceptance. */
+    @Transactional
+    public void declineOffer(int rideId, String username) {
+        var ride=rideDetailsRepository.findByIdForUpdate(rideId).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"Offer not found"));
+        var account=userRepository.findByUserName(username).orElseThrow();
+        var rider=riderDemoRepository.findByUserId(account.getId()).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"Offer not found"));
+        var offer=rideRequestRepository.findByRideId(rideId).stream()
+                .filter(q -> q.getRiderId()==rider.getId()).findFirst().orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"Offer not found"));
+        if ("CANCELLED".equals(offer.getStatus())) return; // Idempotent dismissal, including an already withdrawn offer.
+        if (!"SENT".equals(offer.getStatus()) || !"REQUESTED".equals(ride.getRideStatus()) || ride.getRiderId()!=0)
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"Offer is no longer pending");
+        offer.setStatus("CANCELLED");
+        rideRequestRepository.save(offer);
+        // Other offers, ride state, rider availability, payment and OTP are intentionally untouched.
+        // The push worker rechecks this offer before dispatching any queued request.
+    }
+
     private void requireRider(String username, int riderId) {
         var account = userRepository.findByUserName(username).orElseThrow();
         var rider = riderDemoRepository.findByUserId(account.getId()).orElseThrow();

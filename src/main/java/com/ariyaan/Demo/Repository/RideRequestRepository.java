@@ -14,4 +14,7 @@ public interface RideRequestRepository extends JpaRepository<RideRequestEntity, 
 
     boolean existsByRideIdAndRiderIdAndStatus(int rideId, int riderId, String status);
 
+    boolean existsByRideIdAndRiderIdAndStatusAndCreatedAtAfter(
+            int rideId, int riderId, String status, java.sql.Timestamp createdAfter);
+
 }
