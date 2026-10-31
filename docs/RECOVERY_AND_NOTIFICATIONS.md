@@ -1,5 +1,7 @@
 # Recovery and reliable delivery
 
+Current API contracts are in [API_REFERENCE.md](API_REFERENCE.md). Notification taps can use `GET /api/notifications/ride-requests/{rideId}` for the exact owned offer, and pending declines use `POST /api/notifications/ride-requests/{rideId}/decline` with no body. A declined offer stays dismissed on the server; do not call accepted-ride cancellation for it. Pending lookup, acceptance and push dispatch check both ride and offer timestamps to reject stale legacy offers. See [PUSH_FRONTEND_HANDOFF.md](PUSH_FRONTEND_HANDOFF.md) for response/error examples and both mobile platforms.
+
 Pair backend `production-changes` with both frontend `ariyaan-changes` branches. Existing ride, OTP, payment and invoice contracts remain in place. No new cancellation/refund workflow is introduced.
 
 ## Password recovery
