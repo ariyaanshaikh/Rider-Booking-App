@@ -130,6 +130,7 @@ All seven endpoints below require JWT. Registration and inbox support ADMIN and 
 
 | Method | Path | Result |
 | --- | --- | --- |
+| GET | /api/notifications/readiness | Account-scoped push enablement, storage readiness and active-device count; no tokens |
 | PUT | /api/notifications/devices | Register or update this installation |
 | DELETE | /api/notifications/devices/{app}/{installationId} | Deactivate own installation |
 | GET | /api/notifications | Private inbox array, newest first, limit 50 |

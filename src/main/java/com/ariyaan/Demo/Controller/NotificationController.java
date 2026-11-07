@@ -17,6 +17,8 @@ public class NotificationController {
     private final UserRepository users;
     private final EventNotifications events;
     @org.springframework.beans.factory.annotation.Autowired
+    private com.ariyaan.Demo.Service.NotificationReadiness readiness;
+    @org.springframework.beans.factory.annotation.Autowired
     private com.ariyaan.Demo.Service.RequestLimits limits;
     @org.springframework.beans.factory.annotation.Value("${app.dispatch-expiry-minutes:15}")
     private int dispatchMinutes=15;
@@ -30,8 +32,9 @@ public class NotificationController {
     @PutMapping("/devices") @Transactional
     public Map<String,Boolean> register(Authentication auth,@Valid @RequestBody Device device) {
         var user=users.findByUserName(auth.getName()).orElseThrow();
-        limits.check("push-device",auth.getName(),60);
         if (!user.getRole().name().equalsIgnoreCase(device.app())) throw new org.springframework.security.access.AccessDeniedException("App does not match account role");
+        readiness.requireStorage();
+        limits.check("push-device",auth.getName(),60);
         // Serializes registration/account switches for the same device and token across app instances.
         db.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",device.token());
         db.update("DELETE FROM push_devices WHERE token=? AND (app<>? OR installation_id<>?)",device.token(),device.app(),device.installationId());
@@ -47,6 +50,10 @@ public class NotificationController {
     public Map<String,Boolean> unregister(Authentication auth,@PathVariable String app,@PathVariable String installationId) {
         db.update("UPDATE push_devices SET active=false WHERE app=? AND installation_id=? AND user_id=(SELECT id FROM users WHERE user_name=?)",app,installationId,auth.getName());
         return Map.of("unregistered",true);
+    }
+    @GetMapping("/readiness")
+    public Map<String,Object> readiness(Authentication auth) {
+        return readiness.status(auth.getName());
     }
     @GetMapping
     public List<Map<String,Object>> inbox(Authentication auth) {

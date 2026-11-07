@@ -209,4 +209,34 @@ class RidePushLifecyclePostgresTest {
         assertTrue(db.queryForObject("SELECT active FROM push_devices WHERE installation_id='installation_device_one'",Boolean.class));
         verify(expo).send(eq("ExponentPushToken[device12345678one]"),anyMap(),anyInt());
     }
+    @Test void readinessReportsOnlyTheCurrentAccountsActiveDevices() throws Exception {
+        mvc.perform(get("/api/notifications/readiness").header("Authorization",bearer("rider")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.storageReady").value(true))
+                .andExpect(jsonPath("$.registeredDevices").value(1))
+                .andExpect(jsonPath("$.token").doesNotExist());
+        db.update("UPDATE push_devices SET active=false WHERE user_id=5");
+        mvc.perform(get("/api/notifications/readiness").header("Authorization",bearer("rider")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.registeredDevices").value(0));
+    }
+    @Test void missingPushMigrationReturnsActionable503InsteadOfAnUnexpected500() throws Exception {
+        db.execute("ALTER TABLE push_devices RENAME TO push_devices_unavailable");
+        try {
+            mvc.perform(get("/api/notifications/readiness").header("Authorization",bearer("rider")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.storageReady").value(false));
+            mvc.perform(put("/api/notifications/devices").header("Authorization",bearer("rider"))
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"app\":\"rider\",\"installationId\":\"migration_test_device_123\",\"token\":\"ExpoPushToken[test12345678]\",\"platform\":\"android\"}"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.message").value("Notification storage is unavailable. Deploy the production database migrations and retry."));
+        } finally { db.execute("ALTER TABLE push_devices_unavailable RENAME TO push_devices"); }
+    }
+
+    @Test void partialNotificationSchemaIsNotReportedReady() throws Exception {
+        db.execute("ALTER TABLE push_devices RENAME COLUMN token TO token_unavailable");
+        try {
+            mvc.perform(get("/api/notifications/readiness").header("Authorization",bearer("rider")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.storageReady").value(false));
+        } finally { db.execute("ALTER TABLE push_devices RENAME COLUMN token_unavailable TO token"); }
+    }
+
 }

@@ -85,3 +85,13 @@ The original workspace has an unrelated uncommitted EmailService edit removing s
 - Install native Android and iPhone builds; Expo Go is not the remote-push acceptance environment.
 - With an approved staging deployment, verify actual delivery, tap, ownership, decline, acceptance and payment-gated completion on both physical devices. Check that Admin remains on its monitored ride when completion arrives.
 - Enable production EXPO_PUSH_ENABLED only after the above gates and explicit rollout approval. No Render/Neon setting or live data was changed by this implementation.
+
+## Notification registration diagnostics (maaz branch)
+
+`GET /api/notifications/readiness` requires the existing account JWT. It returns `storageReady`, `pushEnabled`, `workersEnabled` and `registeredDevices` for that account only. It never returns device tokens or credentials.
+
+Registration returns HTTP 503 with a migration instruction if required notification storage is absent, instead of an unexpected SQL 500. Apply the production Flyway migrations; do not create ad hoc tables in the mobile client.
+
+The production profile now defaults `EXPO_PUSH_ENABLED` to true, and the Render Blueprint declares `EXPO_PUSH_ENABLED=true`. A manually configured Render value of false still overrides the profile default and must be changed on that service. Existing FCM/APNs credentials in Expo remain required. Source changes alone do not update the live Render service.
+
+The Rider app now serializes token registration, uses native callback tokens directly and applies a retry cooldown. Push failure must not block loading the Rider profile or GPS UI.
